@@ -138,18 +138,18 @@ export class CallControllerController {
       });
       console.log("🚀 ~ file: call-controller.controller.ts:137 ~ CallControllerController ~ dialInviteCustomer ~ client:", client);
       const log = await client.calls.create({
-        from: '16164413854',
+        from: "16164413854",
         to: {
-          type: 'user',
-          name: 'test8sub@voice.chatchilladev.sip.jambonz.cloud'
+          type: "user",
+          name: "test8sub@voice.chatchilladev.sip.jambonz.cloud",
         },
         call_hook: {
           url: `https://203b-115-73-208-186.ngrok-free.app/call-controller/customer-join-conference`,
-          method: 'POST'
+          method: "POST",
         },
         call_status_hook: {
           url: `https://203b-115-73-208-186.ngrok-free.app/call-controller/call-status`,
-          method: 'POST'
+          method: "POST",
         },
         speech_synthesis_vendor: "google",
         speech_synthesis_language: "en-US",
@@ -208,6 +208,40 @@ export class CallControllerController {
       res.status(200).json(app);
     } catch (err) {
       console.log("🚀 ~ file: call-controller.controller.ts:140 ~ CallControllerController ~ holdConference ~ err:", err);
+      res.sendStatus(503);
+    }
+  }
+  @Post("mute-conference")
+  async muteConference(@Req() req: Request, @Res() res: Response): Promise<any> {
+    try {
+      const client = jambonz("fbbbcf97-139e-4b99-81c5-58f482a42bf2", "599a2ea1-8d33-4ce7-ab9b-9e193c59beda", {
+        baseUrl: "https://jambonz.cloud/api/v1",
+      });
+      const { conf_mute_status = false, call_sid } = req.body;
+      const text = conf_mute_status ? "Muted" : "Unmuted";
+      const app = new WebhookResponse();
+      app.say({ text }).pause({ length: 1.5 });
+      res.status(200).json(app);
+      const log = await client.calls.update(call_sid, { conf_mute_status });
+    } catch (err) {
+      console.log("🚀 ~ file: call-controller.controller.ts:226 ~ CallControllerController ~ muteConference ~ err:", err);
+      res.sendStatus(503);
+    }
+  }
+  @Post("mute-call")
+  async muteCall(@Req() req: Request, @Res() res: Response): Promise<any> {
+    try {
+      const client = jambonz("fbbbcf97-139e-4b99-81c5-58f482a42bf2", "599a2ea1-8d33-4ce7-ab9b-9e193c59beda", {
+        baseUrl: "https://jambonz.cloud/api/v1",
+      });
+      const { mute_status = false, call_sid } = req.body;
+      const text = mute_status ? "Muted" : "Unmuted";
+      const app = new WebhookResponse();
+      app.say({ text }).pause({ length: 1.5 });
+      res.status(200).json(app);
+      const log = await client.calls.update(call_sid, { mute_status });
+    } catch (err) {
+      console.log("🚀 ~ file: call-controller.controller.ts:226 ~ CallControllerController ~ muteConference ~ err:", err);
       res.sendStatus(503);
     }
   }
