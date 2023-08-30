@@ -75,7 +75,7 @@ export class CallControllerController {
   callerCreateConference(@Req() req: Request, @Res() res: Response): any {
     try {
       const { outDialNumber = "17147520454", callerId = "+16164413854" } = req.body;
-      console.log("🚀 ~ file: call-controller.controller.ts:76 ~ CallControllerController ~ callerCreateConference ~ req.body:", req.body);
+      // console.log("🚀 ~ file: call-controller.controller.ts:76 ~ CallControllerController ~ callerCreateConference ~ req.body:", req.body);
       const app = new WebhookResponse();
       app.pause({ length: 2 });
       app
@@ -89,7 +89,7 @@ export class CallControllerController {
         .conference({
           name: process.env.CONFERENCE_NAME || "test-conf",
           statusEvents: ["start", "end", "join", "leave"],
-          statusHook: "/conference/status",
+          statusHook: "/call-controller/conference-status",
           startConferenceOnEnter: true,
           endConferenceOnExit: true,
         });
@@ -104,7 +104,7 @@ export class CallControllerController {
   calleeJoinConference(@Req() req: Request, @Res() res: Response): any {
     try {
       const { outDialNumber = "17147520454", callerId = "+16164413854" } = req.body;
-      console.log("🚀 ~ file: call-controller.controller.ts:95 ~ CallControllerController ~ calleeJoinConference ~ req.body:", req.body);
+      // console.log("🚀 ~ file: call-controller.controller.ts:95 ~ CallControllerController ~ calleeJoinConference ~ req.body:", req.body);
       const app = new WebhookResponse();
       app.pause({ length: 2 });
       app
@@ -118,7 +118,7 @@ export class CallControllerController {
         .conference({
           name: process.env.CONFERENCE_NAME || "test-conf",
           statusEvents: ["start", "end", "join", "leave"],
-          statusHook: "/conference/status",
+          statusHook: "/call-controller/conference-status",
           startConferenceOnEnter: false,
           endConferenceOnExit: false,
         });
@@ -131,12 +131,12 @@ export class CallControllerController {
 
   @Post("dial-invite-customer")
   async dialInviteCustomer(@Req() req: Request, @Res() res: Response): Promise<any> {
-    console.log("🚀 ~ file: call-controller.controller.ts:134 ~ CallControllerController ~ dialInviteCustomer ~ req:", req.body);
+    // console.log("🚀 ~ file: call-controller.controller.ts:134 ~ CallControllerController ~ dialInviteCustomer ~ req:", req.body);
     try {
       const client = jambonz("fbbbcf97-139e-4b99-81c5-58f482a42bf2", "599a2ea1-8d33-4ce7-ab9b-9e193c59beda", {
         baseUrl: "https://jambonz.cloud/api/v1",
       });
-      console.log("🚀 ~ file: call-controller.controller.ts:137 ~ CallControllerController ~ dialInviteCustomer ~ client:", client);
+      // console.log("🚀 ~ file: call-controller.controller.ts:137 ~ CallControllerController ~ dialInviteCustomer ~ client:", client);
       const log = await client.calls.create({
         from: "16164413854",
         to: {
@@ -144,11 +144,11 @@ export class CallControllerController {
           name: "test8sub@voice.chatchilladev.sip.jambonz.cloud",
         },
         call_hook: {
-          url: `https://203b-115-73-208-186.ngrok-free.app/call-controller/customer-join-conference`,
+          url: `https://e443-115-73-208-186.ngrok-free.app/call-controller/customer-join-conference`,
           method: "POST",
         },
         call_status_hook: {
-          url: `https://203b-115-73-208-186.ngrok-free.app/call-controller/call-status`,
+          url: `https://e443-115-73-208-186.ngrok-free.app/call-controller/call-status`,
           method: "POST",
         },
         speech_synthesis_vendor: "google",
@@ -157,7 +157,6 @@ export class CallControllerController {
         speech_recognizer_vendor: "google",
         speech_recognizer_language: "en-US",
       });
-      console.log("🚀 ~ file: call-controller.controller.ts:149 ~ CallControllerController ~ dialInviteCustomer ~ log:", log);
       return log;
     } catch (err) {
       console.log("🚀 ~ file: call-controller.controller.ts:151 ~ CallControllerController ~ dialInviteCustomer ~ err:", err);
@@ -169,7 +168,6 @@ export class CallControllerController {
   customerJoinConference(@Req() req: Request, @Res() res: Response): any {
     try {
       const { outDialNumber = "17147520454", callerId = "+16164413854" } = req.body;
-      console.log("🚀 ~ file: call-controller.controller.ts:134 ~ CallControllerController ~ customerJoinConference ~ req.body:", req.body);
       const app = new WebhookResponse();
       app.pause({ length: 2 });
       app
@@ -183,7 +181,7 @@ export class CallControllerController {
         .conference({
           name: process.env.CONFERENCE_NAME || "test-conf",
           statusEvents: ["start", "end", "join", "leave"],
-          statusHook: "/conference/status",
+          statusHook: "/call-controller/conference-status",
           startConferenceOnEnter: false,
           endConferenceOnExit: false,
         });
@@ -214,15 +212,27 @@ export class CallControllerController {
   @Post("mute-conference")
   async muteConference(@Req() req: Request, @Res() res: Response): Promise<any> {
     try {
-      const client = jambonz("fbbbcf97-139e-4b99-81c5-58f482a42bf2", "599a2ea1-8d33-4ce7-ab9b-9e193c59beda", {
-        baseUrl: "https://jambonz.cloud/api/v1",
-      });
-      const { conf_mute_status = false, call_sid } = req.body;
-      const text = conf_mute_status ? "Muted" : "Unmuted";
+      // const client = jambonz("fbbbcf97-139e-4b99-81c5-58f482a42bf2", "599a2ea1-8d33-4ce7-ab9b-9e193c59beda", {
+      //   baseUrl: "https://jambonz.cloud/api/v1",
+      // });
+      const { conf_mute_status = "mute", call_sid } = req.body;
+      console.log("🚀 ~ file: call-controller.controller.ts:219 ~ CallControllerController ~ muteConference ~ req.body:", req.body);
+      const text = conf_mute_status === "mute" ? "Muted" : "Unmuted";
       const app = new WebhookResponse();
       app.say({ text }).pause({ length: 1.5 });
       res.status(200).json(app);
-      const log = await client.calls.update(call_sid, { conf_mute_status });
+      // const log = await client.calls.update(call_sid, {conf_mute_status: 'mute'});
+      const response = await axios.put(
+        `https://jambonz.cloud/api/v1/Accounts/fbbbcf97-139e-4b99-81c5-58f482a42bf2/Calls/${call_sid}`,
+        {conf_mute_status},
+        {
+          headers: {
+            Authorization: `Bearer 599a2ea1-8d33-4ce7-ab9b-9e193c59beda`,
+          },
+        }
+      );
+  
+      console.log('Call update successfully:', response.data);
     } catch (err) {
       console.log("🚀 ~ file: call-controller.controller.ts:226 ~ CallControllerController ~ muteConference ~ err:", err);
       res.sendStatus(503);
@@ -249,14 +259,15 @@ export class CallControllerController {
   @Post("call-status")
   callStatus(@Req() req: Request, @Res() res: Response): any {
     const { body } = req;
-    console.log("🚀 ~ file: call-controller.controller.ts:45 ~ CallControllerController ~ callStatus ~ body:", body);
+    // console.log("🚀 ~ file: call-controller.controller.ts:45 ~ CallControllerController ~ callStatus ~ body:", body);
     res.sendStatus(200);
   }
 
-  @Post("conference/status")
+  @Post("conference-status")
   conferenceStatus(@Req() req: Request, @Res() res: Response): any {
+    console.log("🚀 ~ file: call-controller.controller.ts:256 ~ CallControllerController ~ conferenceStatus ~ conferenceStatus");
     const { body } = req;
-    console.log("🚀 ~ file: call-controller.controller.ts:101 ~ CallControllerController ~ conferenceStatus ~ body:", body);
+    console.log("🚀 ~ file: call-controller.controller.ts:258 ~ CallControllerController ~ conferenceStatus ~ body:", body);
     res.sendStatus(200);
   }
 }
