@@ -77,6 +77,14 @@ export class CallControllerController {
       const { outDialNumber = "17147520454", callerId = "+16164413854" } = req.body;
       // console.log("🚀 ~ file: call-controller.controller.ts:76 ~ CallControllerController ~ callerCreateConference ~ req.body:", req.body);
       const app = new WebhookResponse();
+      app.config({
+        listen: {
+          url: "wss://346f-115-73-208-186.ngrok-free.app/record",
+          mixType: "stereo",
+          enable: true,
+          // actionHook: "/call-controller/listen-hook",
+        },
+      });
       app.pause({ length: 2 });
       app
         .say({
@@ -93,6 +101,8 @@ export class CallControllerController {
           startConferenceOnEnter: true,
           endConferenceOnExit: true,
         });
+      // console.log("🚀 ~ file: call-controller.controller.ts:104 ~ CallControllerController ~ callerCreateConference ~ app:", app);
+
       res.status(200).json(app);
     } catch (err) {
       console.log("🚀 ~ file: call-controller.controller.ts:86 ~ CallControllerController ~ callerCreateConference ~ err:", err);
@@ -144,11 +154,11 @@ export class CallControllerController {
           name: "test8sub@voice.chatchilladev.sip.jambonz.cloud",
         },
         call_hook: {
-          url: `https://e443-115-73-208-186.ngrok-free.app/call-controller/customer-join-conference`,
+          url: `https://346f-115-73-208-186.ngrok-free.app/call-controller/customer-join-conference`,
           method: "POST",
         },
         call_status_hook: {
-          url: `https://e443-115-73-208-186.ngrok-free.app/call-controller/call-status`,
+          url: `https://346f-115-73-208-186.ngrok-free.app/call-controller/call-status`,
           method: "POST",
         },
         speech_synthesis_vendor: "google",
@@ -224,15 +234,15 @@ export class CallControllerController {
       // const log = await client.calls.update(call_sid, {conf_mute_status: 'mute'});
       const response = await axios.put(
         `https://jambonz.cloud/api/v1/Accounts/fbbbcf97-139e-4b99-81c5-58f482a42bf2/Calls/${call_sid}`,
-        {conf_mute_status},
+        { conf_mute_status },
         {
           headers: {
             Authorization: `Bearer 599a2ea1-8d33-4ce7-ab9b-9e193c59beda`,
           },
-        }
+        },
       );
-  
-      console.log('Call update successfully:', response.data);
+
+      console.log("Call update successfully:", response.data);
     } catch (err) {
       console.log("🚀 ~ file: call-controller.controller.ts:226 ~ CallControllerController ~ muteConference ~ err:", err);
       res.sendStatus(503);
@@ -265,9 +275,15 @@ export class CallControllerController {
 
   @Post("conference-status")
   conferenceStatus(@Req() req: Request, @Res() res: Response): any {
-    console.log("🚀 ~ file: call-controller.controller.ts:256 ~ CallControllerController ~ conferenceStatus ~ conferenceStatus");
+    // console.log("🚀 ~ file: call-controller.controller.ts:256 ~ CallControllerController ~ conferenceStatus ~ conferenceStatus");
     const { body } = req;
-    console.log("🚀 ~ file: call-controller.controller.ts:258 ~ CallControllerController ~ conferenceStatus ~ body:", body);
+    // console.log("🚀 ~ file: call-controller.controller.ts:258 ~ CallControllerController ~ conferenceStatus ~ body:", body);
+    res.sendStatus(200);
+  }
+  @Post("listen-hook")
+  listenHook(@Req() req: Request, @Res() res: Response): any {
+    const { body } = req;
+    console.log("🚀 ~ file: call-controller.controller.ts:283 ~ CallControllerController ~ listenHook ~ body:", body);
     res.sendStatus(200);
   }
 }

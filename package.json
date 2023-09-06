@@ -27,12 +27,17 @@
     "@nestjs/platform-express": "^9.0.0",
     "@types/passport": "^1.0.12",
     "@types/passport-http": "^0.3.9",
+    "aws-sdk": "^2.1450.0",
     "axios": "^1.5.0",
+    "dotenv": "^16.3.1",
     "passport": "^0.6.0",
     "passport-http": "^0.3.0",
     "pino": "^8.15.0",
     "reflect-metadata": "^0.1.13",
-    "rxjs": "^7.2.0"
+    "rxjs": "^7.2.0",
+    "s3-upload-stream": "^1.0.7",
+    "short-uuid": "^4.2.2",
+    "ws": "^8.13.0"
   },
   "devDependencies": {
     "@nestjs/cli": "^9.0.0",
@@ -42,6 +47,7 @@
     "@types/jest": "29.5.1",
     "@types/node": "18.16.12",
     "@types/supertest": "^2.0.11",
+    "@types/ws": "^8.5.5",
     "@typescript-eslint/eslint-plugin": "^5.0.0",
     "@typescript-eslint/parser": "^5.0.0",
     "eslint": "^8.0.1",
