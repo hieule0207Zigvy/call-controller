@@ -72,14 +72,14 @@ export class CallControllerController {
   }
 
   @Post("caller-create-conference")
-  callerCreateConference(@Req() req: Request, @Res() res: Response): any {
+  async allerCreateConference(@Req() req: Request, @Res() res: Response): Promise<any> {
     try {
       const { outDialNumber = "17147520454", callerId = "+16164413854" } = req.body;
       // console.log("🚀 ~ file: call-controller.controller.ts:76 ~ CallControllerController ~ callerCreateConference ~ req.body:", req.body);
       const app = new WebhookResponse();
       app.config({
         listen: {
-          url: "wss://346f-115-73-208-186.ngrok-free.app/record",
+          url: "wss://62b4-115-73-208-186.ngrok-free.app/record",
           mixType: "stereo",
           enable: true,
           // actionHook: "/call-controller/listen-hook",
@@ -102,7 +102,29 @@ export class CallControllerController {
           endConferenceOnExit: true,
         });
       // console.log("🚀 ~ file: call-controller.controller.ts:104 ~ CallControllerController ~ callerCreateConference ~ app:", app);
-
+      // const client = jambonz("fbbbcf97-139e-4b99-81c5-58f482a42bf2", "599a2ea1-8d33-4ce7-ab9b-9e193c59beda", {
+      //   baseUrl: "https://jambonz.cloud/api/v1",
+      // });
+      // const log = await client.calls.create({
+      //   from: "16164413854",
+      //   to: {
+      //     type: "user",
+      //     name: "test8sub@voice.chatchilladev.sip.jambonz.cloud",
+      //   },
+      //   call_hook: {
+      //     url: `https://62b4-115-73-208-186.ngrok-free.app/call-controller/customer-join-conference`,
+      //     method: "POST",
+      //   },
+      //   call_status_hook: {
+      //     url: `https://62b4-115-73-208-186.ngrok-free.app/call-controller/call-status`,
+      //     method: "POST",
+      //   },
+      //   speech_synthesis_vendor: "google",
+      //   speech_synthesis_language: "en-US",
+      //   speech_synthesis_voice: "en-US-Standard-C",
+      //   speech_recognizer_vendor: "google",
+      //   speech_recognizer_language: "en-US",
+      // });
       res.status(200).json(app);
     } catch (err) {
       console.log("🚀 ~ file: call-controller.controller.ts:86 ~ CallControllerController ~ callerCreateConference ~ err:", err);
@@ -154,11 +176,11 @@ export class CallControllerController {
           name: "test8sub@voice.chatchilladev.sip.jambonz.cloud",
         },
         call_hook: {
-          url: `https://346f-115-73-208-186.ngrok-free.app/call-controller/customer-join-conference`,
+          url: `https://62b4-115-73-208-186.ngrok-free.app/call-controller/customer-join-conference`,
           method: "POST",
         },
         call_status_hook: {
-          url: `https://346f-115-73-208-186.ngrok-free.app/call-controller/call-status`,
+          url: `https://62b4-115-73-208-186.ngrok-free.app/call-controller/call-status`,
           method: "POST",
         },
         speech_synthesis_vendor: "google",

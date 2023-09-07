@@ -1,56 +1,72 @@
 var AWS = require("aws-sdk");
 var S3Stream = require("s3-upload-stream");
 const Websocket = require("ws");
-import 'dotenv/config'
+import "dotenv/config";
+import { Readable } from "stream";
+const PCMToMP3Encoder = require("./encoder");
+const S3MultipartUploadStream = require("./s3-multipart-upload-stream");
 
 export const recordAudio = async (logger, socket) => {
-  console.log("🚀 ~ file: recordUtils.ts:6 ~ recordAudio ~ recordAudio:")
-  socket.on("message", function (data) {
+  socket.on("message", function (data, isBinary) {
     /* first message is a JSON object containing metadata about the call */
+    socket._recvInitialMetadata = false;
     try {
-      socket.removeAllListeners("message");
-      const metadata = JSON.parse(data);
-      const { parent_call_sid = "" } = metadata;
-      logger.info({ metadata }, "received metadata");
-      const { callSid, accountSid, applicationSid, from, to, callId, traceId, botSessionId, originalCallerNumber, originalCalledNumber } = metadata;
-      console.log("🚀 ~ file: recordUtils.ts:16 ~ metadata:", metadata)
-      const regex = /[^a-zA-Z0-9]/g;
-      let md = {
-        //'jambonz-callsid': callSid,
-        "jambonz-trace-id": traceId,
-        //accountSid,
-        //applicationSid,
-        "genesys-callerid": from,
-        "genesys-ddi": to,
-        //callId,
-        // "bot-session-id": botSessionId,
-        // "original-caller-number": from.replace(regex, ''),
-        // "original-called-number": to.replace(regex, ''),
-        parent_call_sid: "",
-      };
-      if (parent_call_sid) md = { ...md, parent_call_sid: parent_call_sid };
-      const s3Stream = new S3Stream(new AWS.S3());
-      console.log("🚀 ~ file: recordUtils.ts:37 ~ md:", md)
-
-      const upload = s3Stream.upload({
-        Bucket: process.env.RECORD_BUCKET,
-        Key: `${metadata.callSid}.L16`,
-        ACL: "public-read",
-        ContentType: `audio/L16;rate=${metadata.sampleRate};channels=${metadata.mixType === "stereo" ? 2 : 1}`,
-        Metadata: md,
-      });
-      upload.on("error", function (err) {
-        console.log("🚀 ~ file: recordUtils.ts:41 ~ err:", err)
-        logger.error({ err }, `Error uploading audio to ${process.env.RECORD_BUCKET}`);
-      });
-      const duplex = Websocket.createWebSocketStream(socket);
-      duplex.pipe(upload);
-      logger.info(`starting upload to bucket ${process.env.RECORD_BUCKET}`);
+      if (!isBinary && !socket._recvInitialMetadata) {
+        socket._recvInitialMetadata = true;
+        logger.debug(`initial metadata: ${data}`);
+        const obj = JSON.parse(data.toString());
+        logger.info({ obj }, "received JSON message from jambonz");
+        const { sampleRate, accountSid, callSid, direction, from, to, callId, applicationSid, originatingSipIp, originatingSipTrunkName } = obj;
+        const metadata = {
+          accountSid,
+          callSid,
+          direction,
+          from,
+          to,
+          callId,
+          applicationSid,
+          originatingSipIp,
+          originatingSipTrunkName,
+          sampleRate: `${sampleRate}`,
+        };
+        const day = new Date();
+        let Key = `${day.getFullYear()}/${(day.getMonth() + 1).toString().padStart(2, "0")}`;
+        Key += `/${day.getDate().toString().padStart(2, "0")}/${callSid}.mp3`;
+        const uploaderOpts = {
+          bucketName: process.env.RECORD_BUCKET,
+          Key,
+          metadata,
+          region: process.env.AWS_REGION || "us-east-1",
+          credentials: {
+            accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+            secretAccessKey: process.env.SECRET_ACCESS_KEY,
+          },
+        };
+        const uploadStream = new S3MultipartUploadStream(logger, uploaderOpts);
+        if (!uploadStream) {
+          logger.info("There is no available record uploader, close the socket.");
+          socket.close();
+        }
+        const encoder = new PCMToMP3Encoder({
+          channels: 2,
+          sampleRate: sampleRate,
+          bitrate: 128,
+        });
+        const duplex = Websocket.createWebSocketStream(socket);
+        duplex.pipe(encoder).pipe(uploadStream);
+      }
     } catch (err) {
-      logger.error({ err }, `Error starting upload to bucket ${process.env.RECORD_BUCKET}`);
+      console.log("🚀 ~ file: recordUtils.ts:76 ~ err:", err);
+      // logger.error({ err }, `Error starting upload to bucket ${process.env.RECORD_BUCKET}`);
     }
   });
   socket.on("error", function (err) {
-    logger.error({ err }, "recordAudio: error");
+    logger.error({ err }, "aws upload: error");
+  });
+  socket.on("close", data => {
+    logger.info({ data }, "aws_s3: close");
+  });
+  socket.on("end", function (err) {
+    logger.error({ err }, "aws upload: socket closed from jambonz");
   });
 };

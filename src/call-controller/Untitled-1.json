@@ -1,0 +1,27 @@
+{
+  "level": 30,
+  "time": "2023-09-06T10:13:52.520Z",
+  "pid": 19956,
+  "hostname": "Zigvys-iMac",
+  "metadata": {
+    "sampleRate": 8000,
+    "mixType": "stereo",
+    "callSid": "06a45e29-fc44-4f54-8e53-7927fdbdbafd",
+    "direction": "inbound",
+    "from": "+17147520454",
+    "to": "+16164413854",
+    "callId": "eafda914-c740-123c-9193-0e9252b57157",
+    "sipStatus": 200,
+    "sipReason": "OK",
+    "callStatus": "in-progress",
+    "accountSid": "fbbbcf97-139e-4b99-81c5-58f482a42bf2",
+    "traceId": "2768801cd664507fb293b687d65ad765",
+    "applicationSid": "cf8dd01c-9918-4938-bc74-e31a274ea136",
+    "fsSipAddress": "172.20.10.69:5060",
+    "originatingSipIp": "54.172.60.0",
+    "originatingSipTrunkName": "Twilio-test8",
+    "apiBaseUrl": "http://jambonz.cloud/v1",
+    "fsPublicIp": "35.173.201.179"
+  },
+  "msg": "received metadata"
+}
