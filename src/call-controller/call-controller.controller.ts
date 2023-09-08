@@ -4,12 +4,19 @@ const WebhookResponse = require("@jambonz/node-client").WebhookResponse;
 const jambonz = require("@jambonz/node-client");
 const axios = require("axios");
 
+type UpdateConferenceOption = {
+  conf_hold_status?: string;
+  conf_mute_status?: string;
+  wait_hook?: string;
+};
+
 @Controller("call-controller")
 export class CallControllerController {
   @Get()
   test(): string {
     return "Call controller";
   }
+
   @Post("voicemail")
   voiceMail(@Req() req: Request, @Res() res: Response): any {
     const { body } = req;
@@ -44,6 +51,7 @@ export class CallControllerController {
       res.sendStatus(503);
     }
   }
+
   @Post("dial-come")
   dialCome(@Req() req: Request, @Res() res: Response): any {
     try {
@@ -77,14 +85,14 @@ export class CallControllerController {
       const { outDialNumber = "17147520454", callerId = "+16164413854" } = req.body;
       // console.log("🚀 ~ file: call-controller.controller.ts:76 ~ CallControllerController ~ callerCreateConference ~ req.body:", req.body);
       const app = new WebhookResponse();
-      app.config({
-        listen: {
-          url: `${process.env.WEBSOCKET_URL}${process.env.WS_RECORD_PATH}`,
-          mixType: "stereo",
-          enable: true,
-          // actionHook: "/call-controller/listen-hook",
-        },
-      });
+      // app.config({
+      //   listen: {
+      //     url: `${process.env.WEBSOCKET_URL}${process.env.WS_RECORD_PATH}`,
+      //     mixType: "stereo",
+      //     enable: true,
+      //     // actionHook: "/call-controller/listen-hook",
+      //   },
+      // });
       app.pause({ length: 2 });
       app
         .say({
@@ -224,63 +232,46 @@ export class CallControllerController {
   }
 
   @Post("hold-conference")
-  holdConference(@Req() req: Request, @Res() res: Response): any {
+  async holdConference(@Req() req: Request, @Res() res: Response): Promise<any> {
+    console.log("🚀 ~ file: call-controller.controller.ts:236 ~ CallControllerController ~ holdConference ~ holdConference:");
     try {
-      const text = `
-  You have been placed on brief hold while we try to find a team member to help you.
-  We shall search far and wide to find just the right person for you.
-  So please do continue to wait just a bit longer, if you would.`;
-      const { length = 10 } = req.body;
-      console.log("🚀 ~ file: call-controller.controller.ts:136 ~ CallControllerController ~ holdConference ~ req.body:", req.body);
-      const app = new WebhookResponse();
-      app.say({ text }).pause({ length });
-      res.status(200).json(app);
+      const { conf_hold_status, call_sid } = req.body; // 'hold' or 'unhold'.
+      const updateOption: UpdateConferenceOption = {
+        conf_hold_status,
+      };
+      if (conf_hold_status === "hold") {
+        updateOption.wait_hook = "/call-controller/conference-hold-hook";
+      }
+      const response = await axios.put(`${process.env.JAMBONZ_REST_API_BASE_URL}/Accounts/${process.env.JAMBONZ_ACCOUNT_SID}/Calls/${call_sid}`, updateOption, {
+        headers: {
+          Authorization: `Bearer ${process.env.JAMBONZ_API_KEY}`,
+        },
+      });
+      return res.sendStatus(response?.status);
     } catch (err) {
       console.log("🚀 ~ file: call-controller.controller.ts:140 ~ CallControllerController ~ holdConference ~ err:", err);
-      res.sendStatus(503);
+      return res.sendStatus(503);
     }
   }
+
   @Post("mute-conference")
   async muteConference(@Req() req: Request, @Res() res: Response): Promise<any> {
     try {
-      // const client = jambonz("fbbbcf97-139e-4b99-81c5-58f482a42bf2", "599a2ea1-8d33-4ce7-ab9b-9e193c59beda", {
-      //   baseUrl: "https://jambonz.cloud/api/v1",
-      // });
       const { conf_mute_status = "mute", call_sid } = req.body;
-      console.log("🚀 ~ file: call-controller.controller.ts:219 ~ CallControllerController ~ muteConference ~ req.body:", req.body);
       const text = conf_mute_status === "mute" ? "Muted" : "Unmuted";
       const app = new WebhookResponse();
       app.say({ text }).pause({ length: 1.5 });
       res.status(200).json(app);
-      // const log = await client.calls.update(call_sid, {conf_mute_status: 'mute'});
       const response = await axios.put(
-        `https://jambonz.cloud/api/v1/Accounts/fbbbcf97-139e-4b99-81c5-58f482a42bf2/Calls/${call_sid}`,
+        `${process.env.JAMBONZ_REST_API_BASE_URL}/Accounts/${process.env.JAMBONZ_ACCOUNT_SID}/Calls/${call_sid}`,
         { conf_mute_status },
         {
           headers: {
-            Authorization: `Bearer 599a2ea1-8d33-4ce7-ab9b-9e193c59beda`,
+            Authorization: `Bearer ${process.env.JAMBONZ_API_KEY}`,
           },
         },
       );
-
-      console.log("Call update successfully:", response.data);
-    } catch (err) {
-      console.log("🚀 ~ file: call-controller.controller.ts:226 ~ CallControllerController ~ muteConference ~ err:", err);
-      res.sendStatus(503);
-    }
-  }
-  @Post("mute-call")
-  async muteCall(@Req() req: Request, @Res() res: Response): Promise<any> {
-    try {
-      const client = jambonz("fbbbcf97-139e-4b99-81c5-58f482a42bf2", "599a2ea1-8d33-4ce7-ab9b-9e193c59beda", {
-        baseUrl: "https://jambonz.cloud/api/v1",
-      });
-      const { mute_status = false, call_sid } = req.body;
-      const text = mute_status ? "Muted" : "Unmuted";
-      const app = new WebhookResponse();
-      app.say({ text }).pause({ length: 1.5 });
-      res.status(200).json(app);
-      const log = await client.calls.update(call_sid, { mute_status });
+      return res.sendStatus(response?.status);
     } catch (err) {
       console.log("🚀 ~ file: call-controller.controller.ts:226 ~ CallControllerController ~ muteConference ~ err:", err);
       res.sendStatus(503);
@@ -298,13 +289,19 @@ export class CallControllerController {
   conferenceStatus(@Req() req: Request, @Res() res: Response): any {
     // console.log("🚀 ~ file: call-controller.controller.ts:256 ~ CallControllerController ~ conferenceStatus ~ conferenceStatus");
     const { body } = req;
-    // console.log("🚀 ~ file: call-controller.controller.ts:258 ~ CallControllerController ~ conferenceStatus ~ body:", body);
+    console.log("🚀 ~ file: call-controller.controller.ts:258 ~ CallControllerController ~ conferenceStatus ~ body:", body);
     res.sendStatus(200);
   }
-  @Post("listen-hook")
-  listenHook(@Req() req: Request, @Res() res: Response): any {
-    const { body } = req;
-    console.log("🚀 ~ file: call-controller.controller.ts:283 ~ CallControllerController ~ listenHook ~ body:", body);
-    res.sendStatus(200);
+
+  @Post("conference-hold-hook")
+  conferenceHoldHook(@Req() req: Request, @Res() res: Response): any {
+    // console.log("🚀 ~ file: call-controller.controller.ts:256 ~ CallControllerController ~ conferenceStatus ~ conferenceStatus");
+    const text = `
+    You have been placed on brief hold while we try to find a team member to help you.
+    We shall search far and wide to find just the right person for you.
+    So please do continue to wait just a bit longer, if you would.`;
+    const app = new WebhookResponse();
+    app.say({ text }).pause({ length: 3 });
+    res.status(200).json(app);
   }
 }
