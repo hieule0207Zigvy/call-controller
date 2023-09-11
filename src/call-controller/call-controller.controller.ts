@@ -1,5 +1,6 @@
 import { Controller, Get, Post, Req, Res } from "@nestjs/common";
 import { Request, Response } from "express";
+import { getUniqConferenceName } from "src/utils/until";
 const WebhookResponse = require("@jambonz/node-client").WebhookResponse;
 const jambonz = require("@jambonz/node-client");
 const axios = require("axios");
@@ -32,20 +33,22 @@ export class CallControllerController {
   @Post("caller-create-conference")
   async callerCreateConference(@Req() req: Request, @Res() res: Response): Promise<any> {
     try {
+      const { from } = req.body;
       const client = jambonz(process.env.JAMBONZ_ACCOUNT_SID, process.env.JAMBONZ_API_KEY, {
         baseUrl: process.env.JAMBONZ_REST_API_BASE_URL,
       });
-      // console.log("🚀 ~ file: call-controller.controller.ts:76 ~ CallControllerController ~ callerCreateConference ~ req.body:", req.body);
+      // create unique name for conference
+      const uniqNameConference = getUniqConferenceName();
+      console.log("🚀 ~ file: call-controller.controller.ts:42 ~ CallControllerController ~ callerCreateConference ~ uniqNameConference:", uniqNameConference);
       const app = new WebhookResponse();
-      // record function call
-      app.config({
-        listen: {
-          url: `${process.env.WEBSOCKET_URL}${process.env.WS_RECORD_PATH}`,
-          mixType: "stereo",
-          enable: true,
-          // actionHook: "/call-controller/listen-hook",
-        },
-      });
+      // record function call, call API to chatchilla to get call settings, if 'record' is true enable this config.
+      // app.config({
+      //   listen: {
+      //     url: `${process.env.WEBSOCKET_URL}${process.env.WS_RECORD_PATH}`,
+      //     mixType: "stereo",
+      //     enable: true,
+      //   },
+      // });
       // end record
       app.pause({ length: 2 });
       app
@@ -57,86 +60,159 @@ export class CallControllerController {
           },
         })
         .conference({
-          name: process.env.CONFERENCE_NAME || "test-conf",
+          name: uniqNameConference,
           statusEvents: ["start", "end", "join", "leave"],
           statusHook: "/call-controller/conference-status",
           startConferenceOnEnter: true,
           endConferenceOnExit: true,
-        });
-        // direct invite customer to join the conference
-      // const log = await client.calls.create({
-      //   from: "16164413854",
-      //   to: {
-      //     type: "user",
-      //     name: "test8sub@voice.chatchilladev.sip.jambonz.cloud",
-      //   },
-      //   call_hook: {
-      //     url: `${process.env.BACKEND_URL}/call-controller/customer-join-conference`,
-      //     method: "POST",
-      //   },
-      //   call_status_hook: {
-      //     url: `${process.env.BACKEND_URL}/call-controller/call-status`,
-      //     method: "POST",
-      //   },
-      //   speech_synthesis_vendor: "google",
-      //   speech_synthesis_language: "en-US",
-      //   speech_synthesis_voice: "en-US-Standard-C",
-      //   speech_recognizer_vendor: "google",
-      //   speech_recognizer_language: "en-US",
-      // });
-      res.status(200).json(app);
-    } catch (err) {
-      console.log("🚀 ~ file: call-controller.controller.ts:86 ~ CallControllerController ~ callerCreateConference ~ err:", err);
-      res.sendStatus(503);
-    }
-  }
-
-  @Post("callee-join-conference")
-  calleeJoinConference(@Req() req: Request, @Res() res: Response): any {
-    try {
-      const { outDialNumber = "17147520454", callerId = "+16164413854" } = req.body;
-      // console.log("🚀 ~ file: call-controller.controller.ts:95 ~ CallControllerController ~ calleeJoinConference ~ req.body:", req.body);
-      const app = new WebhookResponse();
-      app.pause({ length: 2 });
-      app
-        .say({
-          text: "Your conference will begin when the moderator arrives",
-          synthesizer: {
-            vendor: "google",
-            language: "en-US",
-          },
-        })
-        .conference({
-          name: process.env.CONFERENCE_NAME || "test-conf",
-          statusEvents: ["start", "end", "join", "leave"],
-          statusHook: "/call-controller/conference-status",
-          startConferenceOnEnter: false,
-          endConferenceOnExit: false,
-        });
-      res.status(200).json(app);
-    } catch (err) {
-      console.log("🚀 ~ file: call-controller.controller.ts:86 ~ CallControllerController ~ callerCreateConference ~ err:", err);
-      res.sendStatus(503);
-    }
-  }
-
-  @Post("dial-invite-customer")
-  async dialInviteCustomer(@Req() req: Request, @Res() res: Response): Promise<any> {
-    // console.log("🚀 ~ file: call-controller.controller.ts:134 ~ CallControllerController ~ dialInviteCustomer ~ req:", req.body);
-    try {
-      const client = jambonz(process.env.JAMBONZ_ACCOUNT_SID, process.env.JAMBONZ_API_KEY, {
-        baseUrl: process.env.JAMBONZ_REST_API_BASE_URL,
-      });
-      // console.log("🚀 ~ file: call-controller.controller.ts:137 ~ CallControllerController ~ dialInviteCustomer ~ client:", client);
-      const log = await client.calls.create({
-        from: "16164413854",
-        to: {
+        }); // conference created.
+      // get call settings and list members of group. Then call them to invite them to join conference.
+      // fake list member
+      const listMember = [
+        {
           type: "user",
           name: "test8sub@voice.chatchilladev.sip.jambonz.cloud",
         },
+        {
+          type: "user",
+          name: "test8@voice.chatchilladev.sip.jambonz.cloud",
+        },
+      ];
+      Promise.all(
+        listMember.map(async member => {
+          await client.calls.create({
+            from: from,
+            to: member,
+            call_hook: {
+              url: `${process.env.BACKEND_URL}/call-controller/person-join-conference/${uniqNameConference}`,
+              method: "GET",
+            },
+            call_status_hook: {
+              url: `${process.env.BACKEND_URL}/call-controller/call-status`,
+              method: "POST",
+            },
+            speech_synthesis_vendor: "google",
+            speech_synthesis_language: "en-US",
+            speech_synthesis_voice: "en-US-Standard-C",
+            speech_recognizer_vendor: "google",
+            speech_recognizer_language: "en-US",
+          });
+        }),
+      ).catch(err => {
+        console.log("🚀 ~ file: call-controller.controller.ts:85 ~ CallControllerController ~ callerCreateConference ~ err:", err);
+        res.sendStatus(503);
+      });
+      res.status(200).json(app);
+    } catch (err) {
+      console.log("🚀 ~ file: call-controller.controller.ts:86 ~ CallControllerController ~ callerCreateConference ~ err:", err);
+      res.sendStatus(503);
+    }
+  }
+
+  @Post("agent-join-or-conference")
+  async agentJoinOrCreateConference(@Req() req: Request, @Res() res: Response): Promise<any> {
+    try {
+      // Call Api to chatchilla to get name of the conference want to join, if outbound will make new conference.
+      const app = new WebhookResponse();
+      const response = {
+        isOutBoundCall: true,
+        to: {
+          type: "phone",
+          number: "17147520454",
+        },
+        uniqNameConference: "",
+        from: "16164413854",
+      }; //call api
+      //case 1: join conference
+
+      if (!response?.isOutBoundCall) {
+        const { uniqNameConference } = response; // from response;
+        app.pause({ length: 2 });
+        app
+          .say({
+            text: "Your conference will begin when the moderator arrives",
+            synthesizer: {
+              vendor: "google",
+              language: "en-US",
+            },
+          })
+          .conference({
+            name: uniqNameConference,
+            statusEvents: ["start", "end", "join", "leave"],
+            statusHook: "/call-controller/conference-status",
+            startConferenceOnEnter: false,
+            endConferenceOnExit: false,
+          });
+        return res.status(200).json(app);
+      } else {
+        const { to, from } = response;
+        const uniqNameConference = getUniqConferenceName();
+        console.log("🚀 ~ file: call-controller.controller.ts:151 ~ CallControllerController ~ agentJoinOrCreateConference ~ uniqNameConference:", uniqNameConference);
+        const client = jambonz(process.env.JAMBONZ_ACCOUNT_SID, process.env.JAMBONZ_API_KEY, {
+          baseUrl: process.env.JAMBONZ_REST_API_BASE_URL,
+        });
+        app.pause({ length: 2 });
+        app
+          .say({
+            text: "we will now begin the conference",
+            synthesizer: {
+              vendor: "google",
+              language: "en-US",
+            },
+          })
+          .conference({
+            name: uniqNameConference,
+            statusEvents: ["start", "end", "join", "leave"],
+            statusHook: "/call-controller/conference-status",
+            startConferenceOnEnter: true,
+            endConferenceOnExit: true,
+          }); // conference created.
+        res.status(200).json(app);
+        await client.calls.create({
+          from,
+          to,
+          call_hook: {
+            url: `${process.env.BACKEND_URL}/call-controller/person-join-conference/${uniqNameConference}`,
+            method: "GET",
+          },
+          call_status_hook: {
+            url: `${process.env.BACKEND_URL}/call-controller/call-status`,
+            method: "POST",
+          },
+          speech_synthesis_vendor: "google",
+          speech_synthesis_language: "en-US",
+          speech_synthesis_voice: "en-US-Standard-C",
+          speech_recognizer_vendor: "google",
+          speech_recognizer_language: "en-US",
+        });
+      }
+    } catch (err) {
+      console.log("🚀 ~ file: call-controller.controller.ts:86 ~ CallControllerController ~ agentJoinOrCreateConference ~ err:", err);
+      res.sendStatus(503);
+    }
+  }
+
+  @Post("agent-invite-customer")
+  async agentInviteCustomer(@Req() req: Request, @Res() res: Response): Promise<any> {
+    // console.log("🚀 ~ file: call-controller.controller.ts:134 ~ CallControllerController ~ dialInviteCustomer ~ req:", req.body);
+    try {
+      const {
+        from = "16164413854",
+        uniqNameConference,
+        to = {
+          type: "user",
+          name: "test8sub@voice.chatchilladev.sip.jambonz.cloud",
+        },
+      } = req.body;
+      const client = jambonz(process.env.JAMBONZ_ACCOUNT_SID, process.env.JAMBONZ_API_KEY, {
+        baseUrl: process.env.JAMBONZ_REST_API_BASE_URL,
+      });
+      const log = await client.calls.create({
+        from,
+        to,
         call_hook: {
-          url: `${process.env.BACKEND_URL}/call-controller/customer-join-conference`,
-          method: "POST",
+          url: `${process.env.BACKEND_URL}/call-controller/person-join-conference/${uniqNameConference}`,
+          method: "GET",
         },
         call_status_hook: {
           url: `${process.env.BACKEND_URL}/call-controller/call-status`,
@@ -155,10 +231,13 @@ export class CallControllerController {
     }
   }
 
-  @Post("customer-join-conference")
-  customerJoinConference(@Req() req: Request, @Res() res: Response): any {
+  @Get("person-join-conference/:conferenceName")
+  personJoinConference(@Req() req: Request, @Res() res: Response): any {
+    console.log("🚀 ~ file: call-controller.controller.ts:176 ~ CallControllerController ~ customerJoinConference ~ customerJoinConference");
     try {
-      const { outDialNumber = "17147520454", callerId = "+16164413854" } = req.body;
+      const { conferenceName } = req.params;
+      console.log("🚀 ~ file: call-controller.controller.ts:178 ~ CallControllerController ~ customerJoinConference ~ conferenceName:", conferenceName);
+      // create unique name for conference
       const app = new WebhookResponse();
       app.pause({ length: 2 });
       app
@@ -170,7 +249,7 @@ export class CallControllerController {
           },
         })
         .conference({
-          name: process.env.CONFERENCE_NAME || "test-conf",
+          name: conferenceName,
           statusEvents: ["start", "end", "join", "leave"],
           statusHook: "/call-controller/conference-status",
           startConferenceOnEnter: false,
@@ -234,7 +313,7 @@ export class CallControllerController {
   conferenceStatus(@Req() req: Request, @Res() res: Response): any {
     // console.log("🚀 ~ file: call-controller.controller.ts:256 ~ CallControllerController ~ conferenceStatus ~ conferenceStatus");
     const { body } = req;
-    console.log("🚀 ~ file: call-controller.controller.ts:258 ~ CallControllerController ~ conferenceStatus:", body);
+    // console.log("🚀 ~ file: call-controller.controller.ts:258 ~ CallControllerController ~ conferenceStatus:", body);
     res.sendStatus(200);
   }
 
