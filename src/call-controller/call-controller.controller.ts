@@ -29,70 +29,24 @@ export class CallControllerController {
     res.status(200).json(app);
   }
 
-  @Post("dial")
-  dial(@Req() req: Request, @Res() res: Response): any {
-    try {
-      const app = new WebhookResponse();
-      const { outDialNumber = "17147520454", callerId = "+16164413854" } = req.body;
-      console.log("🚀 ~ file: call-controller.controller.ts:26 ~ CallControllerController ~ dial ~ req.body:", req.body);
-      app.dial({
-        answerOnBridge: true,
-        callerId,
-        target: [
-          {
-            type: "phone",
-            number: outDialNumber,
-          },
-        ],
-      });
-      res.status(200).json(app);
-    } catch (err) {
-      console.log("🚀 ~ file: call-controller.controller.ts:28 ~ CallControllerController ~ dial ~ err:", err);
-      res.sendStatus(503);
-    }
-  }
-
-  @Post("dial-come")
-  dialCome(@Req() req: Request, @Res() res: Response): any {
-    try {
-      const app = new WebhookResponse();
-      const { outDialNumber = "17147520454", callerId = "+16164413854" } = req.body;
-      console.log("🚀 ~ file: call-controller.controller.ts:26 ~ CallControllerController ~ dial ~ req.body:", req.body);
-      app.dial({
-        answerOnBridge: true,
-        callerId: req.body.from,
-        target: [
-          {
-            type: "user",
-            name: "test8sub@voice.chatchilladev.sip.jambonz.cloud",
-          },
-          {
-            type: "user",
-            name: "test8@voice.chatchilladev.sip.jambonz.cloud",
-          },
-        ],
-      });
-      res.status(200).json(app);
-    } catch (err) {
-      console.log("🚀 ~ file: call-controller.controller.ts:68 ~ CallControllerController ~ dialCome ~ err:", err);
-      res.sendStatus(503);
-    }
-  }
-
   @Post("caller-create-conference")
   async callerCreateConference(@Req() req: Request, @Res() res: Response): Promise<any> {
     try {
-      const { outDialNumber = "17147520454", callerId = "+16164413854" } = req.body;
+      const client = jambonz(process.env.JAMBONZ_ACCOUNT_SID, process.env.JAMBONZ_API_KEY, {
+        baseUrl: process.env.JAMBONZ_REST_API_BASE_URL,
+      });
       // console.log("🚀 ~ file: call-controller.controller.ts:76 ~ CallControllerController ~ callerCreateConference ~ req.body:", req.body);
       const app = new WebhookResponse();
-      // app.config({
-      //   listen: {
-      //     url: `${process.env.WEBSOCKET_URL}${process.env.WS_RECORD_PATH}`,
-      //     mixType: "stereo",
-      //     enable: true,
-      //     // actionHook: "/call-controller/listen-hook",
-      //   },
-      // });
+      // record function call
+      app.config({
+        listen: {
+          url: `${process.env.WEBSOCKET_URL}${process.env.WS_RECORD_PATH}`,
+          mixType: "stereo",
+          enable: true,
+          // actionHook: "/call-controller/listen-hook",
+        },
+      });
+      // end record
       app.pause({ length: 2 });
       app
         .say({
@@ -109,29 +63,27 @@ export class CallControllerController {
           startConferenceOnEnter: true,
           endConferenceOnExit: true,
         });
-      const client = jambonz(process.env.JAMBONZ_ACCOUNT_SID, process.env.JAMBONZ_API_KEY, {
-        baseUrl: process.env.JAMBONZ_REST_API_BASE_URL,
-      });
-      const log = await client.calls.create({
-        from: "16164413854",
-        to: {
-          type: "user",
-          name: "test8sub@voice.chatchilladev.sip.jambonz.cloud",
-        },
-        call_hook: {
-          url: `${process.env.BACKEND_URL}/call-controller/customer-join-conference`,
-          method: "POST",
-        },
-        call_status_hook: {
-          url: `${process.env.BACKEND_URL}/call-controller/call-status`,
-          method: "POST",
-        },
-        speech_synthesis_vendor: "google",
-        speech_synthesis_language: "en-US",
-        speech_synthesis_voice: "en-US-Standard-C",
-        speech_recognizer_vendor: "google",
-        speech_recognizer_language: "en-US",
-      });
+        // direct invite customer to join the conference
+      // const log = await client.calls.create({
+      //   from: "16164413854",
+      //   to: {
+      //     type: "user",
+      //     name: "test8sub@voice.chatchilladev.sip.jambonz.cloud",
+      //   },
+      //   call_hook: {
+      //     url: `${process.env.BACKEND_URL}/call-controller/customer-join-conference`,
+      //     method: "POST",
+      //   },
+      //   call_status_hook: {
+      //     url: `${process.env.BACKEND_URL}/call-controller/call-status`,
+      //     method: "POST",
+      //   },
+      //   speech_synthesis_vendor: "google",
+      //   speech_synthesis_language: "en-US",
+      //   speech_synthesis_voice: "en-US-Standard-C",
+      //   speech_recognizer_vendor: "google",
+      //   speech_recognizer_language: "en-US",
+      // });
       res.status(200).json(app);
     } catch (err) {
       console.log("🚀 ~ file: call-controller.controller.ts:86 ~ CallControllerController ~ callerCreateConference ~ err:", err);
@@ -278,18 +230,11 @@ export class CallControllerController {
     }
   }
 
-  @Post("call-status")
-  callStatus(@Req() req: Request, @Res() res: Response): any {
-    const { body } = req;
-    // console.log("🚀 ~ file: call-controller.controller.ts:45 ~ CallControllerController ~ callStatus ~ body:", body);
-    res.sendStatus(200);
-  }
-
   @Post("conference-status")
   conferenceStatus(@Req() req: Request, @Res() res: Response): any {
     // console.log("🚀 ~ file: call-controller.controller.ts:256 ~ CallControllerController ~ conferenceStatus ~ conferenceStatus");
     const { body } = req;
-    console.log("🚀 ~ file: call-controller.controller.ts:258 ~ CallControllerController ~ conferenceStatus ~ body:", body);
+    console.log("🚀 ~ file: call-controller.controller.ts:258 ~ CallControllerController ~ conferenceStatus:", body);
     res.sendStatus(200);
   }
 
@@ -303,5 +248,62 @@ export class CallControllerController {
     const app = new WebhookResponse();
     app.say({ text }).pause({ length: 3 });
     res.status(200).json(app);
+  }
+
+  @Post("dial")
+  dial(@Req() req: Request, @Res() res: Response): any {
+    try {
+      const app = new WebhookResponse();
+      const { outDialNumber = "17147520454", callerId = "+16164413854" } = req.body;
+      console.log("🚀 ~ file: call-controller.controller.ts:26 ~ CallControllerController ~ dial ~ req.body:", req.body);
+      app.dial({
+        answerOnBridge: true,
+        callerId,
+        target: [
+          {
+            type: "phone",
+            number: outDialNumber,
+          },
+        ],
+      });
+      res.status(200).json(app);
+    } catch (err) {
+      console.log("🚀 ~ file: call-controller.controller.ts:28 ~ CallControllerController ~ dial ~ err:", err);
+      res.sendStatus(503);
+    }
+  }
+
+  @Post("dial-come")
+  dialCome(@Req() req: Request, @Res() res: Response): any {
+    try {
+      const app = new WebhookResponse();
+      const { outDialNumber = "17147520454", callerId = "+16164413854" } = req.body;
+      console.log("🚀 ~ file: call-controller.controller.ts:26 ~ CallControllerController ~ dial ~ req.body:", req.body);
+      app.dial({
+        answerOnBridge: true,
+        callerId: req.body.from,
+        target: [
+          {
+            type: "user",
+            name: "test8sub@voice.chatchilladev.sip.jambonz.cloud",
+          },
+          {
+            type: "user",
+            name: "test8@voice.chatchilladev.sip.jambonz.cloud",
+          },
+        ],
+      });
+      res.status(200).json(app);
+    } catch (err) {
+      console.log("🚀 ~ file: call-controller.controller.ts:68 ~ CallControllerController ~ dialCome ~ err:", err);
+      res.sendStatus(503);
+    }
+  }
+
+  @Post("call-status")
+  callStatus(@Req() req: Request, @Res() res: Response): any {
+    const { body } = req;
+    // console.log("🚀 ~ file: call-controller.controller.ts:45 ~ CallControllerController ~ callStatus ~ body:", body);
+    res.sendStatus(200);
   }
 }
