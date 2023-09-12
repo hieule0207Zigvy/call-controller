@@ -13,6 +13,11 @@ type UpdateConferenceOption = {
 
 @Controller("call-controller")
 export class CallControllerController {
+  private jambonz: any = new WebhookResponse();
+  private client: any = jambonz(process.env.JAMBONZ_ACCOUNT_SID, process.env.JAMBONZ_API_KEY, {
+    baseUrl: process.env.JAMBONZ_REST_API_BASE_URL,
+  });
+
   @Get()
   test(): string {
     return "Call controller";
@@ -34,24 +39,20 @@ export class CallControllerController {
   async callerCreateConference(@Req() req: Request, @Res() res: Response): Promise<any> {
     try {
       const { from } = req.body;
-      const client = jambonz(process.env.JAMBONZ_ACCOUNT_SID, process.env.JAMBONZ_API_KEY, {
-        baseUrl: process.env.JAMBONZ_REST_API_BASE_URL,
-      });
       // create unique name for conference
       const uniqNameConference = getUniqConferenceName();
       console.log("🚀 ~ file: call-controller.controller.ts:42 ~ CallControllerController ~ callerCreateConference ~ uniqNameConference:", uniqNameConference);
-      const app = new WebhookResponse();
       // record function call, call API to chatchilla to get call settings, if 'record' is true enable this config.
-      // app.config({
-      //   listen: {
-      //     url: `${process.env.WEBSOCKET_URL}${process.env.WS_RECORD_PATH}`,
-      //     mixType: "stereo",
-      //     enable: true,
-      //   },
-      // });
+      this.jambonz.config({
+        listen: {
+          url: `${process.env.WEBSOCKET_URL}${process.env.WS_RECORD_PATH}`,
+          mixType: "stereo",
+          enable: true,
+        },
+      });
       // end record
-      app.pause({ length: 2 });
-      app
+      this.jambonz.pause({ length: 2 });
+      this.jambonz
         .say({
           text: "we will now begin the conference",
           synthesizer: {
@@ -80,7 +81,7 @@ export class CallControllerController {
       ];
       Promise.all(
         listMember.map(async member => {
-          await client.calls.create({
+          await this.client.calls.create({
             from: from,
             to: member,
             call_hook: {
@@ -102,6 +103,7 @@ export class CallControllerController {
         console.log("🚀 ~ file: call-controller.controller.ts:85 ~ CallControllerController ~ callerCreateConference ~ err:", err);
         res.sendStatus(503);
       });
+      const app = this.jambonz;
       res.status(200).json(app);
     } catch (err) {
       console.log("🚀 ~ file: call-controller.controller.ts:86 ~ CallControllerController ~ callerCreateConference ~ err:", err);
@@ -113,7 +115,6 @@ export class CallControllerController {
   async agentJoinOrCreateConference(@Req() req: Request, @Res() res: Response): Promise<any> {
     try {
       // Call Api to chatchilla to get name of the conference want to join, if outbound will make new conference.
-      const app = new WebhookResponse();
       const response = {
         isOutBoundCall: true,
         to: {
@@ -127,8 +128,8 @@ export class CallControllerController {
 
       if (!response?.isOutBoundCall) {
         const { uniqNameConference } = response; // from response;
-        app.pause({ length: 2 });
-        app
+        this.jambonz.pause({ length: 2 });
+        this.jambonz
           .say({
             text: "Your conference will begin when the moderator arrives",
             synthesizer: {
@@ -143,16 +144,14 @@ export class CallControllerController {
             startConferenceOnEnter: false,
             endConferenceOnExit: false,
           });
+        const app = this.jambonz;
         return res.status(200).json(app);
       } else {
         const { to, from } = response;
         const uniqNameConference = getUniqConferenceName();
         console.log("🚀 ~ file: call-controller.controller.ts:151 ~ CallControllerController ~ agentJoinOrCreateConference ~ uniqNameConference:", uniqNameConference);
-        const client = jambonz(process.env.JAMBONZ_ACCOUNT_SID, process.env.JAMBONZ_API_KEY, {
-          baseUrl: process.env.JAMBONZ_REST_API_BASE_URL,
-        });
-        app.pause({ length: 2 });
-        app
+        this.jambonz.pause({ length: 2 });
+        this.jambonz
           .say({
             text: "we will now begin the conference",
             synthesizer: {
@@ -167,8 +166,9 @@ export class CallControllerController {
             startConferenceOnEnter: true,
             endConferenceOnExit: true,
           }); // conference created.
+        const app = this.jambonz;
         res.status(200).json(app);
-        await client.calls.create({
+        await this.client.calls.create({
           from,
           to,
           call_hook: {
@@ -204,10 +204,7 @@ export class CallControllerController {
           name: "test8sub@voice.chatchilladev.sip.jambonz.cloud",
         },
       } = req.body;
-      const client = jambonz(process.env.JAMBONZ_ACCOUNT_SID, process.env.JAMBONZ_API_KEY, {
-        baseUrl: process.env.JAMBONZ_REST_API_BASE_URL,
-      });
-      const log = await client.calls.create({
+      const log = await this.client.calls.create({
         from,
         to,
         call_hook: {
@@ -238,9 +235,8 @@ export class CallControllerController {
       const { conferenceName } = req.params;
       console.log("🚀 ~ file: call-controller.controller.ts:178 ~ CallControllerController ~ customerJoinConference ~ conferenceName:", conferenceName);
       // create unique name for conference
-      const app = new WebhookResponse();
-      app.pause({ length: 2 });
-      app
+      this.jambonz.pause({ length: 2 });
+      this.jambonz
         .say({
           text: "Your has been invite to this conference",
           synthesizer: {
@@ -255,6 +251,7 @@ export class CallControllerController {
           startConferenceOnEnter: false,
           endConferenceOnExit: false,
         });
+      const app = this.jambonz;
       res.status(200).json(app);
     } catch (err) {
       console.log("🚀 ~ file: call-controller.controller.ts:86 ~ CallControllerController ~ callerCreateConference ~ err:", err);
@@ -290,8 +287,8 @@ export class CallControllerController {
     try {
       const { conf_mute_status = "mute", call_sid } = req.body;
       const text = conf_mute_status === "mute" ? "Muted" : "Unmuted";
-      const app = new WebhookResponse();
-      app.say({ text }).pause({ length: 1.5 });
+      this.jambonz.say({ text }).pause({ length: 1.5 });
+      const app = this.jambonz;
       res.status(200).json(app);
       const response = await axios.put(
         `${process.env.JAMBONZ_REST_API_BASE_URL}/Accounts/${process.env.JAMBONZ_ACCOUNT_SID}/Calls/${call_sid}`,
@@ -324,8 +321,8 @@ export class CallControllerController {
     You have been placed on brief hold while we try to find a team member to help you.
     We shall search far and wide to find just the right person for you.
     So please do continue to wait just a bit longer, if you would.`;
-    const app = new WebhookResponse();
-    app.say({ text }).pause({ length: 3 });
+    this.jambonz.say({ text }).pause({ length: 3 });
+    const app = this.jambonz;
     res.status(200).json(app);
   }
 
