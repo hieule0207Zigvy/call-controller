@@ -87,36 +87,38 @@ export class CallControllerController {
           name: "test8@voice.chatchilladev.sip.jambonz.cloud",
         },
       ];
-      const listPhoneRinging = [];
-      Promise.all(
-        listMember.map(async member => {
-          const callRingingSid = await this.client.calls.create({
-            from: from,
-            to: member,
-            call_hook: {
-              url: `${process.env.BACKEND_URL}/call-controller/person-join-conference/${uniqNameConference}`,
-              method: "GET",
-            },
-            call_status_hook: {
-              url: `${process.env.BACKEND_URL}/call-controller/call-status`,
-              method: "POST",
-            },
-            speech_synthesis_vendor: "google",
-            speech_synthesis_language: "en-US",
-            speech_synthesis_voice: "en-US-Standard-C",
-            speech_recognizer_vendor: "google",
-            speech_recognizer_language: "en-US",
+      const listPhoneFirstInviteRinging = [];
+      setTimeout(() => {
+        Promise.all(
+          listMember.map(async member => {
+            const callRingingSid = await this.client.calls.create({
+              from: from,
+              to: member,
+              call_hook: {
+                url: `${process.env.BACKEND_URL}/call-controller/person-join-conference/${uniqNameConference}`,
+                method: "GET",
+              },
+              call_status_hook: {
+                url: `${process.env.BACKEND_URL}/call-controller/call-status`,
+                method: "POST",
+              },
+              speech_synthesis_vendor: "google",
+              speech_synthesis_language: "en-US",
+              speech_synthesis_voice: "en-US-Standard-C",
+              speech_recognizer_vendor: "google",
+              speech_recognizer_language: "en-US",
+            });
+            listPhoneFirstInviteRinging.push(callRingingSid);
+          }),
+        )
+          .then(values => {
+            redisConferenceCallingData[uniqNameConference] = { ...redisConferenceCallingData[uniqNameConference], ...{ listPhoneFirstInviteRinging: listPhoneFirstInviteRinging } };
+          })
+          .catch(err => {
+            console.log("🚀 ~ file: call-controller.controller.ts:85 ~ CallControllerController ~ callerCreateConference ~ err:", err);
+            res.sendStatus(503);
           });
-          listPhoneRinging.push(callRingingSid);
-        }),
-      )
-        .then(values => {
-          redisConferenceCallingData[uniqNameConference] = { ...redisConferenceCallingData[uniqNameConference], ...{ listPhoneRinging: listPhoneRinging } };
-        })
-        .catch(err => {
-          console.log("🚀 ~ file: call-controller.controller.ts:85 ~ CallControllerController ~ callerCreateConference ~ err:", err);
-          res.sendStatus(503);
-        });
+      }, 2000);
     } catch (err) {
       console.log("🚀 ~ file: call-controller.controller.ts:86 ~ CallControllerController ~ callerCreateConference ~ err:", err);
       res.sendStatus(503);
@@ -202,14 +204,15 @@ export class CallControllerController {
   async makeInviteConference(@Req() req: Request, @Res() res: Response): Promise<any> {
     // console.log("🚀 ~ file: call-controller.controller.ts:134 ~ CallControllerController ~ dialInviteCustomer ~ req:", req.body);
     try {
-      const {
-        from = "16164413854",
-        uniqNameConference,
-        to = {
-          type: "user",
-          name: "test8sub@voice.chatchilladev.sip.jambonz.cloud",
-        },
-      } = req.body;
+      // const {
+      //   from = "16164413854",
+      //   uniqNameConference,
+      //   to = {
+      //     type: "user",
+      //     name: "test8sub@voice.chatchilladev.sip.jambonz.cloud",
+      //   },
+      // } = req.body;
+      const { from, to, uniqNameConference } = req.body;
       const log = await this.client.calls.create({
         from,
         to,
@@ -227,7 +230,7 @@ export class CallControllerController {
         speech_recognizer_vendor: "google",
         speech_recognizer_language: "en-US",
       });
-      return log;
+      return res.status(200).json(log);
     } catch (err) {
       console.log("🚀 ~ file: call-controller.controller.ts:151 ~ CallControllerController ~ dialInviteCustomer ~ err:", err);
       res.sendStatus(503);
@@ -245,7 +248,7 @@ export class CallControllerController {
         statusEvents: [ConferenceType.start, ConferenceType.end, ConferenceType.join, ConferenceType.leave],
         statusHook: "/call-controller/conference-status",
       });
-      redisConferenceCallingData[conferenceName].isOneOfMemberAnswer = true;
+      if (!redisConferenceCallingData[conferenceName].isOneOfMemberAnswer) redisConferenceCallingData[conferenceName].isOneOfMemberAnswer = true;
       res.status(200).json(app);
     } catch (err) {
       console.log("🚀 ~ file: call-controller.controller.ts:86 ~ CallControllerController ~ callerCreateConference ~ err:", err);
@@ -307,7 +310,7 @@ export class CallControllerController {
       const { body } = req;
       const { conference_sid, event, members, friendly_name, call_sid } = body;
       console.log("🚀 ~ file: call-controller.controller.ts:258 ~ CallControllerController ~ conferenceStatus:", body);
-
+      const { listPhoneFirstInviteRinging = [] } = redisConferenceCallingData[friendly_name];
       if (event === ConferenceType.start) {
         const response = await axios.put(
           `${process.env.JAMBONZ_REST_API_BASE_URL}/Accounts/${process.env.JAMBONZ_ACCOUNT_SID}/Calls/${call_sid}`,
@@ -319,9 +322,8 @@ export class CallControllerController {
           },
         );
       }
-      if (event === ConferenceType.join && members > 1) {
-        const { listPhoneRinging = [] } = redisConferenceCallingData[friendly_name];
-        const filterAcceptCallSid = listPhoneRinging.filter((ringingCall: string) => ringingCall !== call_sid);
+      if (event === ConferenceType.join && members > 1 && listPhoneFirstInviteRinging.includes(call_sid)) {
+        const filterAcceptCallSid = listPhoneFirstInviteRinging.filter((ringingCall: string) => ringingCall !== call_sid);
         Promise.all(
           filterAcceptCallSid.map(async (call: string) => {
             await axios.put(
