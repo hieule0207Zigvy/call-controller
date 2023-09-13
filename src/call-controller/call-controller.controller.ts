@@ -279,8 +279,8 @@ export class CallControllerController {
     }
   }
 
-  @Post("mute-conference")
-  async muteConference(@Req() req: Request, @Res() res: Response): Promise<any> {
+  @Post("mute-member-conference")
+  async muteMemberConference(@Req() req: Request, @Res() res: Response): Promise<any> {
     try {
       const { conf_mute_status = "mute", call_sid } = req.body;
       const response = await axios.put(
@@ -292,7 +292,27 @@ export class CallControllerController {
           },
         },
       );
-      return res.status(response?.status).json({status: '202'});
+      return res.status(response?.status).json({ status: response?.status });
+    } catch (err) {
+      console.log("🚀 ~ file: call-controller.controller.ts:226 ~ CallControllerController ~ muteConference ~ err:", err);
+      res.sendStatus(503);
+    }
+  }
+
+  @Post("remove-member-conference")
+  async removeMemberConference(@Req() req: Request, @Res() res: Response): Promise<any> {
+    try {
+      const { call_sid } = req.body;
+      const response = await axios.put(
+        `${process.env.JAMBONZ_REST_API_BASE_URL}/Accounts/${process.env.JAMBONZ_ACCOUNT_SID}/Calls/${call_sid}`,
+        { call_status: "completed" },
+        {
+          headers: {
+            Authorization: `Bearer ${process.env.JAMBONZ_API_KEY}`,
+          },
+        },
+      );
+      return res.status(response?.status).json({ status: response?.status });
     } catch (err) {
       console.log("🚀 ~ file: call-controller.controller.ts:226 ~ CallControllerController ~ muteConference ~ err:", err);
       res.sendStatus(503);
