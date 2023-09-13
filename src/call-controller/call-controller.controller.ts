@@ -10,6 +10,12 @@ type UpdateConferenceOption = {
   conf_mute_status?: string;
   wait_hook?: string;
 };
+const ConferenceType = {
+  start: "start",
+  leave: "leave",
+  join: "join",
+  end: "end",
+};
 const redisConferenceCallingData = {};
 @Controller("call-controller")
 export class CallControllerController {
@@ -25,7 +31,6 @@ export class CallControllerController {
   @Post("voicemail")
   voiceMail(@Req() req: Request, @Res() res: Response): any {
     const { body } = req;
-    console.log("🚀 ~ file: call-controller.controller.ts:14 ~ CallControllerController ~ helloWorld ~ body:", body);
     const text = `<speak>
     Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged. It was popularised in the 1960s with the release of Letraset sheets containing Lorem Ipsum passages, and more recently with desktop publishing software like Aldus PageMaker including versions of Lorem Ipsum.
     </speak>`;
@@ -61,7 +66,7 @@ export class CallControllerController {
         })
         .conference({
           name: uniqNameConference,
-          statusEvents: ["start", "end", "join", "leave"],
+          statusEvents: [ConferenceType.end, ConferenceType.start, ConferenceType.join, ConferenceType.leave],
           statusHook: "/call-controller/conference-status",
           waitHook: "/call-controller/conference-wait-hook",
           startConferenceOnEnter: true,
@@ -145,7 +150,7 @@ export class CallControllerController {
           })
           .conference({
             name: uniqNameConference,
-            statusEvents: ["start", "end", "join", "leave"],
+            statusEvents: [ConferenceType.start, ConferenceType.end, ConferenceType.join, ConferenceType.leave],
             statusHook: "/call-controller/conference-status",
           });
         return res.status(200).json(app);
@@ -163,7 +168,7 @@ export class CallControllerController {
           })
           .conference({
             name: uniqNameConference,
-            statusEvents: ["start", "end", "join", "leave"],
+            statusEvents: [ConferenceType.start, ConferenceType.end, ConferenceType.join, ConferenceType.leave],
             statusHook: "/call-controller/conference-status",
             startConferenceOnEnter: true,
             endConferenceOnExit: true,
@@ -193,8 +198,8 @@ export class CallControllerController {
     }
   }
 
-  @Post("agent-invite-customer")
-  async agentInviteCustomer(@Req() req: Request, @Res() res: Response): Promise<any> {
+  @Post("make-invite-conference")
+  async makeInviteConference(@Req() req: Request, @Res() res: Response): Promise<any> {
     // console.log("🚀 ~ file: call-controller.controller.ts:134 ~ CallControllerController ~ dialInviteCustomer ~ req:", req.body);
     try {
       const {
@@ -237,7 +242,7 @@ export class CallControllerController {
       // create unique name for conference
       app.conference({
         name: conferenceName,
-        statusEvents: ["start", "end", "join", "leave"],
+        statusEvents: [ConferenceType.start, ConferenceType.end, ConferenceType.join, ConferenceType.leave],
         statusHook: "/call-controller/conference-status",
       });
       redisConferenceCallingData[conferenceName].isOneOfMemberAnswer = true;
@@ -303,7 +308,7 @@ export class CallControllerController {
       const { conference_sid, event, members, friendly_name, call_sid } = body;
       console.log("🚀 ~ file: call-controller.controller.ts:258 ~ CallControllerController ~ conferenceStatus:", body);
 
-      if (event === "start") {
+      if (event === ConferenceType.start) {
         const response = await axios.put(
           `${process.env.JAMBONZ_REST_API_BASE_URL}/Accounts/${process.env.JAMBONZ_ACCOUNT_SID}/Calls/${call_sid}`,
           { call_hook: `${process.env.BACKEND_URL}/call-controller/conference-wait-hook?conferenceName=${friendly_name}&callSid=${call_sid}` },
@@ -314,25 +319,23 @@ export class CallControllerController {
           },
         );
       }
-      // if (event === "join" && members > 1) {
-      //   const { listPhoneRinging = [] } = redisConferenceCallingData[friendly_name];
-      //   console.log("🚀 ~ file: call-controller.controller.ts:346 ~ CallControllerController ~ conferenceStatus ~ listPhoneRinging:", listPhoneRinging);
-      //   const filterAcceptCallSid = listPhoneRinging.filter(ringingCall => ringingCall !== call_sid);
-      //   console.log("🚀 ~ file: call-controller.controller.ts:348 ~ CallControllerController ~ conferenceStatus ~ filterAcceptCallSid:", filterAcceptCallSid);
-      //   Promise.all(
-      //     filterAcceptCallSid.map(async call => {
-      //       const response = await axios.put(
-      //         `${process.env.JAMBONZ_REST_API_BASE_URL}/Accounts/${process.env.JAMBONZ_ACCOUNT_SID}/Calls/${call}`,
-      //         { call_status: "no-answer" },
-      //         {
-      //           headers: {
-      //             Authorization: `Bearer ${process.env.JAMBONZ_API_KEY}`,
-      //           },
-      //         },
-      //       );
-      //     }),
-      //   );
-      // }
+      if (event === ConferenceType.join && members > 1) {
+        const { listPhoneRinging = [] } = redisConferenceCallingData[friendly_name];
+        const filterAcceptCallSid = listPhoneRinging.filter((ringingCall: string) => ringingCall !== call_sid);
+        Promise.all(
+          filterAcceptCallSid.map(async (call: string) => {
+            await axios.put(
+              `${process.env.JAMBONZ_REST_API_BASE_URL}/Accounts/${process.env.JAMBONZ_ACCOUNT_SID}/Calls/${call}`,
+              { call_status: "no-answer" },
+              {
+                headers: {
+                  Authorization: `Bearer ${process.env.JAMBONZ_API_KEY}`,
+                },
+              },
+            );
+          }),
+        );
+      }
       res.sendStatus(200);
     } catch (error) {
       console.log("🚀 ~ file: call-controller.controller.ts:362 ~ CallControllerController ~ conferenceStatus ~ error:", error);
@@ -364,7 +367,6 @@ export class CallControllerController {
     const conferenceName: any = req.query.conferenceName;
     const callSid = req.query.callSid;
     setTimeout(async () => {
-      console.log("🚀 ~ file: call-controller.controller.ts:368 ~ CallControllerController ~ setTimeout ~ setTimeout:");
       const { isOneOfMemberAnswer } = redisConferenceCallingData[conferenceName];
       if (!isOneOfMemberAnswer) {
         console.log("🚀 ~ file: call-controller.controller.ts:371 ~ CallControllerController ~ setTimeout ~ isOneOfMemberAnswer:", isOneOfMemberAnswer);
