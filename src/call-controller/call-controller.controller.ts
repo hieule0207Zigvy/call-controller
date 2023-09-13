@@ -13,7 +13,6 @@ type UpdateConferenceOption = {
 const redisConferenceCallingData = {};
 @Controller("call-controller")
 export class CallControllerController {
-  private jambonz: any = new WebhookResponse();
   private client: any = jambonz(process.env.JAMBONZ_ACCOUNT_SID, process.env.JAMBONZ_API_KEY, {
     baseUrl: process.env.JAMBONZ_REST_API_BASE_URL,
   });
@@ -30,8 +29,8 @@ export class CallControllerController {
     const text = `<speak>
     Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged. It was popularised in the 1960s with the release of Letraset sheets containing Lorem Ipsum passages, and more recently with desktop publishing software like Aldus PageMaker including versions of Lorem Ipsum.
     </speak>`;
-    this.jambonz.say({ text });
-    const app = this.jambonz;
+    const app = new WebhookResponse();
+    app.say({ text });
     res.status(200).json(app);
   }
 
@@ -41,9 +40,10 @@ export class CallControllerController {
       const { from } = req.body;
       // create unique name for conference
       const uniqNameConference = getUniqConferenceName();
+      const app = new WebhookResponse();
       console.log("🚀 ~ file: call-controller.controller.ts:42 ~ CallControllerController ~ callerCreateConference ~ uniqNameConference:", uniqNameConference);
       // enable recording.
-      // this.jambonz.config({
+      // app.config({
       //   listen: {
       //     url: `${process.env.WEBSOCKET_URL}${process.env.WS_RECORD_PATH}`,
       //     mixType: "stereo",
@@ -51,7 +51,7 @@ export class CallControllerController {
       //   },
       // });
       // end record
-      this.jambonz
+      app
         .say({
           text: "Hello You are calling to Group ONE, We are calling to all members to of this group",
           synthesizer: {
@@ -68,7 +68,6 @@ export class CallControllerController {
           endConferenceOnExit: true,
         });
       // conference created
-      const app = this.jambonz;
       res.status(200).json(app);
       redisConferenceCallingData[uniqNameConference] = {
         isOneOfMemberAnswer: false,
@@ -84,52 +83,35 @@ export class CallControllerController {
         },
       ];
       const listPhoneRinging = [];
-      // setTimeout(async () => {
-      //   Promise.all(
-      //     listMember.map(async member => {
-      //       const callRingingSid = await this.client.calls.create({
-      //         from: from,
-      //         to: member,
-      //         call_hook: {
-      //           url: `${process.env.BACKEND_URL}/call-controller/person-join-conference/${uniqNameConference}`,
-      //           method: "GET",
-      //         },
-      //         call_status_hook: {
-      //           url: `${process.env.BACKEND_URL}/call-controller/call-status`,
-      //           method: "POST",
-      //         },
-      //         speech_synthesis_vendor: "google",
-      //         speech_synthesis_language: "en-US",
-      //         speech_synthesis_voice: "en-US-Standard-C",
-      //         speech_recognizer_vendor: "google",
-      //         speech_recognizer_language: "en-US",
-      //       });
-      //       listPhoneRinging.push(callRingingSid);
-      //     }),
-      //   )
-      //     .then(values => {
-      //       redisConferenceCallingData[uniqNameConference] = { ...redisConferenceCallingData[uniqNameConference], ...{ listPhoneRinging: listPhoneRinging } };
-      //     })
-      //     .catch(err => {
-      //       console.log("🚀 ~ file: call-controller.controller.ts:85 ~ CallControllerController ~ callerCreateConference ~ err:", err);
-      //       res.sendStatus(503);
-      //     });
-      // }, 10000);
-
-      // setTimeout(async () => {
-      //   const { isOneOfMemberAnswer } = redisConferenceCallingData[uniqNameConference];
-      //   if (!isOneOfMemberAnswer) {
-      //     this.jambonz.say({
-      //       text: "No one pickup the phone in next 60 seconds, the call will be hang up automatically",
-      //       synthesizer: {
-      //         vendor: "google",
-      //         language: "en-US",
-      //       },
-      //     });
-      //     const app = this.jambonz;
-      //     res.status(200).json(app);
-      //   }
-      // }, 20000);
+      Promise.all(
+        listMember.map(async member => {
+          const callRingingSid = await this.client.calls.create({
+            from: from,
+            to: member,
+            call_hook: {
+              url: `${process.env.BACKEND_URL}/call-controller/person-join-conference/${uniqNameConference}`,
+              method: "GET",
+            },
+            call_status_hook: {
+              url: `${process.env.BACKEND_URL}/call-controller/call-status`,
+              method: "POST",
+            },
+            speech_synthesis_vendor: "google",
+            speech_synthesis_language: "en-US",
+            speech_synthesis_voice: "en-US-Standard-C",
+            speech_recognizer_vendor: "google",
+            speech_recognizer_language: "en-US",
+          });
+          listPhoneRinging.push(callRingingSid);
+        }),
+      )
+        .then(values => {
+          redisConferenceCallingData[uniqNameConference] = { ...redisConferenceCallingData[uniqNameConference], ...{ listPhoneRinging: listPhoneRinging } };
+        })
+        .catch(err => {
+          console.log("🚀 ~ file: call-controller.controller.ts:85 ~ CallControllerController ~ callerCreateConference ~ err:", err);
+          res.sendStatus(503);
+        });
     } catch (err) {
       console.log("🚀 ~ file: call-controller.controller.ts:86 ~ CallControllerController ~ callerCreateConference ~ err:", err);
       res.sendStatus(503);
@@ -150,11 +132,10 @@ export class CallControllerController {
         from: "16164413854",
       }; //call api
       //case 1: join conference
-
+      const app = new WebhookResponse();
       if (!response?.isOutBoundCall) {
         const { uniqNameConference } = response; // from response;
-        this.jambonz.pause({ length: 2 });
-        this.jambonz
+        app
           .say({
             text: "Your conference will begin when the moderator arrives",
             synthesizer: {
@@ -167,14 +148,12 @@ export class CallControllerController {
             statusEvents: ["start", "end", "join", "leave"],
             statusHook: "/call-controller/conference-status",
           });
-        const app = this.jambonz;
         return res.status(200).json(app);
       } else {
         const { to, from } = response;
         const uniqNameConference = getUniqConferenceName();
         console.log("🚀 ~ file: call-controller.controller.ts:151 ~ CallControllerController ~ agentJoinOrCreateConference ~ uniqNameConference:", uniqNameConference);
-        this.jambonz.pause({ length: 2 });
-        this.jambonz
+        app
           .say({
             text: "we will now begin the conference",
             synthesizer: {
@@ -189,7 +168,6 @@ export class CallControllerController {
             startConferenceOnEnter: true,
             endConferenceOnExit: true,
           }); // conference created.
-        const app = this.jambonz;
         res.status(200).json(app);
         await this.client.calls.create({
           from,
@@ -255,14 +233,14 @@ export class CallControllerController {
   personJoinConference(@Req() req: Request, @Res() res: Response): any {
     try {
       const { conferenceName } = req.params;
+      const app = new WebhookResponse();
       // create unique name for conference
-      this.jambonz.conference({
+      app.conference({
         name: conferenceName,
         statusEvents: ["start", "end", "join", "leave"],
         statusHook: "/call-controller/conference-status",
       });
       redisConferenceCallingData[conferenceName].isOneOfMemberAnswer = true;
-      const app = this.jambonz;
       res.status(200).json(app);
     } catch (err) {
       console.log("🚀 ~ file: call-controller.controller.ts:86 ~ CallControllerController ~ callerCreateConference ~ err:", err);
@@ -298,8 +276,8 @@ export class CallControllerController {
     try {
       const { conf_mute_status = "mute", call_sid } = req.body;
       const text = conf_mute_status === "mute" ? "Muted" : "Unmuted";
-      this.jambonz.say({ text }).pause({ length: 1.5 });
-      const app = this.jambonz;
+      const app = new WebhookResponse();
+      app.say({ text }).pause({ length: 1.5 });
       res.status(200).json(app);
       const response = await axios.put(
         `${process.env.JAMBONZ_REST_API_BASE_URL}/Accounts/${process.env.JAMBONZ_ACCOUNT_SID}/Calls/${call_sid}`,
@@ -369,8 +347,8 @@ export class CallControllerController {
     You have been placed on brief hold while we try to find a team member to help you.
     We shall search far and wide to find just the right person for you.
     So please do continue to wait just a bit longer, if you would.`;
-    this.jambonz.say({ text }).pause({ length: 3 });
-    const app = this.jambonz;
+    const app = new WebhookResponse();
+    app.say({ text });
     res.status(200).json(app);
   }
 
@@ -385,10 +363,11 @@ export class CallControllerController {
   conferenceWaitHook(@Req() req: Request, @Res() res: Response): any {
     const conferenceName: any = req.query.conferenceName;
     const callSid = req.query.callSid;
-
     setTimeout(async () => {
+      console.log("🚀 ~ file: call-controller.controller.ts:368 ~ CallControllerController ~ setTimeout ~ setTimeout:");
       const { isOneOfMemberAnswer } = redisConferenceCallingData[conferenceName];
       if (!isOneOfMemberAnswer) {
+        console.log("🚀 ~ file: call-controller.controller.ts:371 ~ CallControllerController ~ setTimeout ~ isOneOfMemberAnswer:", isOneOfMemberAnswer);
         const app = new WebhookResponse();
         app.say({
           text: "No one pickup the phone, the call will be hang up automatically",
