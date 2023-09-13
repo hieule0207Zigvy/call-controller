@@ -80,11 +80,11 @@ export class CallControllerController {
       const listMember = [
         {
           type: "user",
-          name: "test8sub@voice.chatchilladev.sip.jambonz.cloud",
+          name: "test8@voice.chatchilladev.sip.jambonz.cloud",
         },
         {
           type: "user",
-          name: "test8@voice.chatchilladev.sip.jambonz.cloud",
+          name: "test8sub@voice.chatchilladev.sip.jambonz.cloud",
         },
       ];
       const listPhoneFirstInviteRinging = [];
@@ -283,10 +283,6 @@ export class CallControllerController {
   async muteConference(@Req() req: Request, @Res() res: Response): Promise<any> {
     try {
       const { conf_mute_status = "mute", call_sid } = req.body;
-      const text = conf_mute_status === "mute" ? "Muted" : "Unmuted";
-      const app = new WebhookResponse();
-      app.say({ text }).pause({ length: 1.5 });
-      res.status(200).json(app);
       const response = await axios.put(
         `${process.env.JAMBONZ_REST_API_BASE_URL}/Accounts/${process.env.JAMBONZ_ACCOUNT_SID}/Calls/${call_sid}`,
         { conf_mute_status },
@@ -296,7 +292,7 @@ export class CallControllerController {
           },
         },
       );
-      return res.sendStatus(response?.status);
+      return res.status(response?.status).json({status: '202'});
     } catch (err) {
       console.log("🚀 ~ file: call-controller.controller.ts:226 ~ CallControllerController ~ muteConference ~ err:", err);
       res.sendStatus(503);
@@ -310,7 +306,7 @@ export class CallControllerController {
       const { body } = req;
       const { conference_sid, event, members, friendly_name, call_sid } = body;
       console.log("🚀 ~ file: call-controller.controller.ts:258 ~ CallControllerController ~ conferenceStatus:", body);
-      const { listPhoneFirstInviteRinging = [] } = redisConferenceCallingData[friendly_name];
+      const listPhoneFirstInviteRinging = redisConferenceCallingData[friendly_name]?.listPhoneFirstInviteRinging || [];
       if (event === ConferenceType.start) {
         const response = await axios.put(
           `${process.env.JAMBONZ_REST_API_BASE_URL}/Accounts/${process.env.JAMBONZ_ACCOUNT_SID}/Calls/${call_sid}`,
