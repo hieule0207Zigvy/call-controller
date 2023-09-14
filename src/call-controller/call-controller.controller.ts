@@ -1,6 +1,6 @@
 import { Controller, Get, Post, Req, Res } from "@nestjs/common";
 import { Request, Response } from "express";
-import { getUniqConferenceName } from "src/utils/until";
+import { getUniqConferenceName, isPhoneNumberOrSIP } from "src/utils/until";
 const WebhookResponse = require("@jambonz/node-client").WebhookResponse;
 const jambonz = require("@jambonz/node-client");
 const axios = require("axios");
@@ -15,6 +15,11 @@ const ConferenceType = {
   leave: "leave",
   join: "join",
   end: "end",
+};
+type ToUserType = {
+  type?: string;
+  number?: string;
+  name?: string;
 };
 const redisConferenceCallingData = {};
 @Controller("call-controller")
@@ -43,10 +48,10 @@ export class CallControllerController {
   async callerCreateConference(@Req() req: Request, @Res() res: Response): Promise<any> {
     try {
       const { from } = req.body;
+      console.log("🚀 ~ file: call-controller.controller.ts:51 ~ CallControllerController ~ callerCreateConference ~ req.body:", req.body);
       // create unique name for conference
       const uniqNameConference = getUniqConferenceName();
       const app = new WebhookResponse();
-      console.log("🚀 ~ file: call-controller.controller.ts:42 ~ CallControllerController ~ callerCreateConference ~ uniqNameConference:", uniqNameConference);
       // enable recording.
       // app.config({
       //   listen: {
@@ -56,143 +61,140 @@ export class CallControllerController {
       //   },
       // });
       // end record
-      app
-        .say({
-          text: "Hello You are calling to Group ONE, We are calling to all members to of this group",
-          synthesizer: {
-            vendor: "google",
-            language: "en-US",
-          },
-        })
-        .conference({
-          name: uniqNameConference,
-          statusEvents: [ConferenceType.end, ConferenceType.start, ConferenceType.join, ConferenceType.leave],
-          statusHook: "/call-controller/conference-status",
-          waitHook: "/call-controller/conference-wait-hook",
-          startConferenceOnEnter: true,
-          endConferenceOnExit: true,
-        });
-      // conference created
-      res.status(200).json(app);
-      redisConferenceCallingData[uniqNameConference] = {
-        isOneOfMemberAnswer: false,
-      };
-      const listMember = [
-        {
-          type: "user",
-          name: "test8@voice.chatchilladev.sip.jambonz.cloud",
-        },
-        {
-          type: "user",
-          name: "test8sub@voice.chatchilladev.sip.jambonz.cloud",
-        },
-      ];
-      const listPhoneFirstInviteRinging = [];
-      setTimeout(() => {
-        Promise.all(
-          listMember.map(async member => {
-            const callRingingSid = await this.client.calls.create({
-              from: from,
-              to: member,
-              call_hook: {
-                url: `${process.env.BACKEND_URL}/call-controller/person-join-conference/${uniqNameConference}`,
-                method: "GET",
-              },
-              call_status_hook: {
-                url: `${process.env.BACKEND_URL}/call-controller/call-status`,
-                method: "POST",
-              },
-              speech_synthesis_vendor: "google",
-              speech_synthesis_language: "en-US",
-              speech_synthesis_voice: "en-US-Standard-C",
-              speech_recognizer_vendor: "google",
-              speech_recognizer_language: "en-US",
-            });
-            listPhoneFirstInviteRinging.push(callRingingSid);
-          }),
-        )
-          .then(values => {
-            redisConferenceCallingData[uniqNameConference] = { ...redisConferenceCallingData[uniqNameConference], ...{ listPhoneFirstInviteRinging: listPhoneFirstInviteRinging } };
+      // call api to chatchilla to get all did.
+      //if from is one of did of chatchilla, do nothing. Already handle in agent create conference.
+      if (from !== "16164413854" && from !== "16164399715") {
+        app
+          .say({
+            text: "Hello You are calling to Group ONE, We are calling to all members to of this group",
+            synthesizer: {
+              vendor: "google",
+              language: "en-US",
+            },
           })
-          .catch(err => {
-            console.log("🚀 ~ file: call-controller.controller.ts:85 ~ CallControllerController ~ callerCreateConference ~ err:", err);
-            res.sendStatus(503);
+          .conference({
+            name: uniqNameConference,
+            statusEvents: [ConferenceType.end, ConferenceType.start, ConferenceType.join, ConferenceType.leave],
+            statusHook: "/call-controller/conference-status",
+            waitHook: "/call-controller/conference-wait-hook",
+            startConferenceOnEnter: true,
+            endConferenceOnExit: true,
           });
-      }, 2000);
+        // conference created
+        res.status(200).json(app);
+        redisConferenceCallingData[uniqNameConference] = {
+          isOneOfMemberAnswer: false,
+        };
+
+        const listMember = [
+          {
+            type: "user",
+            name: "test8@voice.chatchilladev.sip.jambonz.cloud",
+          },
+          {
+            type: "user",
+            name: "test8sub@voice.chatchilladev.sip.jambonz.cloud",
+          },
+        ];
+        const listPhoneFirstInviteRinging = [];
+        setTimeout(() => {
+          Promise.all(
+            listMember.map(async member => {
+              const callRingingSid = await this.client.calls.create({
+                from: from,
+                to: member,
+                call_hook: {
+                  url: `${process.env.BACKEND_URL}/call-controller/person-join-conference/${uniqNameConference}`,
+                  method: "GET",
+                },
+                call_status_hook: {
+                  url: `${process.env.BACKEND_URL}/call-controller/call-status`,
+                  method: "POST",
+                },
+                speech_synthesis_vendor: "google",
+                speech_synthesis_language: "en-US",
+                speech_synthesis_voice: "en-US-Standard-C",
+                speech_recognizer_vendor: "google",
+                speech_recognizer_language: "en-US",
+              });
+              listPhoneFirstInviteRinging.push(callRingingSid);
+            }),
+          )
+            .then(values => {
+              redisConferenceCallingData[uniqNameConference] = {
+                ...redisConferenceCallingData[uniqNameConference],
+                ...{ listPhoneFirstInviteRinging: listPhoneFirstInviteRinging },
+              };
+            })
+            .catch(err => {
+              console.log("🚀 ~ file: call-controller.controller.ts:85 ~ CallControllerController ~ callerCreateConference ~ err:", err);
+              res.sendStatus(503);
+            });
+        }, 2000);
+      } else res.status(200);
     } catch (err) {
       console.log("🚀 ~ file: call-controller.controller.ts:86 ~ CallControllerController ~ callerCreateConference ~ err:", err);
       res.sendStatus(503);
     }
   }
 
-  @Post("agent-join-or-conference")
-  async agentJoinOrCreateConference(@Req() req: Request, @Res() res: Response): Promise<any> {
+  @Post("agent-create-conference")
+  async agentCreateConference(@Req() req: Request, @Res() res: Response): Promise<any> {
     try {
-      // Call Api to chatchilla to get name of the conference want to join, if outbound will make new conference.
-      const response = {
-        isOutBoundCall: true,
-        to: {
-          type: "phone",
-          number: "17147520454",
-        },
-        uniqNameConference: "",
-        from: "16164413854",
-      }; //call api
-      //case 1: join conference
-      const app = new WebhookResponse();
-      if (!response?.isOutBoundCall) {
-        const { uniqNameConference } = response; // from response;
-        app
-          .say({
-            text: "Your conference will begin when the moderator arrives",
-            synthesizer: {
-              vendor: "google",
-              language: "en-US",
-            },
-          })
-          .conference({
-            name: uniqNameConference,
-            statusEvents: [ConferenceType.start, ConferenceType.end, ConferenceType.join, ConferenceType.leave],
-            statusHook: "/call-controller/conference-status",
-          });
-        return res.status(200).json(app);
+      // Call Api to chatchilla to get did of sip account is calling.
+      const { from, to } = req.body;
+      let toUser: ToUserType = {};
+      let fromDid = "";
+      if (from === "test8") fromDid = "16164413854";
+      if (from === "test8sub") fromDid = "16164399715";
+      if (isPhoneNumberOrSIP(to) === "sip") {
+        toUser.type = "user";
+        toUser.name = to;
       } else {
-        const { to, from } = response;
-        const uniqNameConference = getUniqConferenceName();
-        console.log("🚀 ~ file: call-controller.controller.ts:151 ~ CallControllerController ~ agentJoinOrCreateConference ~ uniqNameConference:", uniqNameConference);
-        app
-          .say({
-            text: "we will now begin the conference",
-            synthesizer: {
-              vendor: "google",
-              language: "en-US",
-            },
-          })
-          .conference({
-            name: uniqNameConference,
-            statusEvents: [ConferenceType.start, ConferenceType.end, ConferenceType.join, ConferenceType.leave],
-            statusHook: "/call-controller/conference-status",
-            startConferenceOnEnter: true,
-            endConferenceOnExit: true,
-          }); // conference created.
-        res.status(200).json(app);
-        await this.client.calls.create({
-          from,
-          to,
-          call_hook: {
-            url: `${process.env.BACKEND_URL}/call-controller/person-join-conference/${uniqNameConference}`,
-            method: "GET",
-          },
-          call_status_hook: {
-            url: `${process.env.BACKEND_URL}/call-controller/call-status`,
-            method: "POST",
-          },
-          speech_synthesis_vendor: "google",
-          speech_synthesis_language: "en-US",
-          speech_synthesis_voice: "en-US-Standard-C",
-          speech_recognizer_vendor: "google",
-          speech_recognizer_language: "en-US",
-        });
+        if (to === "16164413854") {
+          toUser.type = "user";
+          toUser.name = "test8@voice.chatchilladev.sip.jambonz.cloud";
+        } else if (to === "16164399715") {
+          toUser.type = "user";
+          toUser.name = "test8sub@voice.chatchilladev.sip.jambonz.cloud";
+        } else {
+          toUser.type = "phone";
+          toUser.number = to.length <= 10 ? `1${to}` : to;
+        }
+      }
+      const app = new WebhookResponse();
+      const uniqNameConference = getUniqConferenceName();
+      console.log("🚀 ~ file: call-controller.controller.ts:151 ~ CallControllerController ~ agentJoinOrCreateConference ~ uniqNameConference:", uniqNameConference);
+      app.conference({
+        name: uniqNameConference,
+        statusEvents: [ConferenceType.start, ConferenceType.end, ConferenceType.join, ConferenceType.leave],
+        statusHook: "/call-controller/conference-status",
+        startConferenceOnEnter: true,
+        endConferenceOnExit: true,
+      }); // conference created.
+      redisConferenceCallingData[uniqNameConference] = {
+        isOneOfMemberAnswer: false,
+      };
+      res.status(200).json(app);
+      const log = await this.client.calls.create({
+        from: fromDid,
+        to: toUser,
+        call_hook: {
+          url: `${process.env.BACKEND_URL}/call-controller/person-join-conference/${uniqNameConference}`,
+          method: "GET",
+        },
+        call_status_hook: {
+          url: `${process.env.BACKEND_URL}/call-controller/call-status`,
+          method: "POST",
+        },
+        speech_synthesis_vendor: "google",
+        speech_synthesis_language: "en-US",
+        speech_synthesis_voice: "en-US-Standard-C",
+        speech_recognizer_vendor: "google",
+        speech_recognizer_language: "en-US",
+      });
+      if (!!log) {
+        redisConferenceCallingData[uniqNameConference].listPhoneFirstInviteRinging = [log];
       }
     } catch (err) {
       console.log("🚀 ~ file: call-controller.controller.ts:86 ~ CallControllerController ~ agentJoinOrCreateConference ~ err:", err);
@@ -211,6 +213,7 @@ export class CallControllerController {
       //     type: "user",
       //     name: "test8sub@voice.chatchilladev.sip.jambonz.cloud",
       //   },
+      //to = {"type": "phone", "number": "17147520454"},
       // } = req.body;
       const { from, to, uniqNameConference } = req.body;
       const log = await this.client.calls.create({
@@ -241,6 +244,7 @@ export class CallControllerController {
   personJoinConference(@Req() req: Request, @Res() res: Response): any {
     try {
       const { conferenceName } = req.params;
+      console.log("🚀 ~ file: call-controller.controller.ts:226 ~ CallControllerController ~ personJoinConference ~ conferenceName:", conferenceName);
       const app = new WebhookResponse();
       // create unique name for conference
       app.conference({
@@ -248,7 +252,7 @@ export class CallControllerController {
         statusEvents: [ConferenceType.start, ConferenceType.end, ConferenceType.join, ConferenceType.leave],
         statusHook: "/call-controller/conference-status",
       });
-      if (!redisConferenceCallingData[conferenceName].isOneOfMemberAnswer) redisConferenceCallingData[conferenceName].isOneOfMemberAnswer = true;
+      redisConferenceCallingData[conferenceName].isOneOfMemberAnswer = true;
       res.status(200).json(app);
     } catch (err) {
       console.log("🚀 ~ file: call-controller.controller.ts:86 ~ CallControllerController ~ callerCreateConference ~ err:", err);
@@ -376,7 +380,6 @@ export class CallControllerController {
   @Post("call-status")
   callStatus(@Req() req: Request, @Res() res: Response): any {
     const { body } = req;
-    // console.log("🚀 ~ file: call-controller.controller.ts:45 ~ CallControllerController ~ callStatus ~ body:", body);
     res.sendStatus(200);
   }
 
@@ -385,9 +388,7 @@ export class CallControllerController {
     const conferenceName: any = req.query.conferenceName;
     const callSid = req.query.callSid;
     setTimeout(async () => {
-      const { isOneOfMemberAnswer } = redisConferenceCallingData[conferenceName];
-      if (!isOneOfMemberAnswer) {
-        console.log("🚀 ~ file: call-controller.controller.ts:371 ~ CallControllerController ~ setTimeout ~ isOneOfMemberAnswer:", isOneOfMemberAnswer);
+      if (!redisConferenceCallingData[conferenceName]?.isOneOfMemberAnswer) {
         const app = new WebhookResponse();
         app.say({
           text: "No one pickup the phone, the call will be hang up automatically",
