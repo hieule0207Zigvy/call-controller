@@ -48,9 +48,9 @@ export class CallControllerController {
   async callerCreateConference(@Req() req: Request, @Res() res: Response): Promise<any> {
     try {
       const { from } = req.body;
-      console.log("🚀 ~ file: call-controller.controller.ts:51 ~ CallControllerController ~ callerCreateConference ~ req.body:", req.body);
       // create unique name for conference
       const uniqNameConference = getUniqConferenceName();
+      console.log("🚀 ~ file: call-controller.controller.ts:53 ~ CallControllerController ~ callerCreateConference ~ uniqNameConference:", uniqNameConference)
       const app = new WebhookResponse();
       // enable recording.
       // app.config({
@@ -77,7 +77,7 @@ export class CallControllerController {
             statusEvents: [ConferenceType.end, ConferenceType.start, ConferenceType.join, ConferenceType.leave],
             statusHook: "/call-controller/conference-status",
             waitHook: "/call-controller/conference-wait-hook",
-            startConferenceOnEnter: true,
+            // startConferenceOnEnter: true,
             endConferenceOnExit: true,
           });
         // conference created
@@ -169,7 +169,7 @@ export class CallControllerController {
         name: uniqNameConference,
         statusEvents: [ConferenceType.start, ConferenceType.end, ConferenceType.join, ConferenceType.leave],
         statusHook: "/call-controller/conference-status",
-        startConferenceOnEnter: true,
+        // startConferenceOnEnter: true,
         endConferenceOnExit: true,
       }); // conference created.
       redisConferenceCallingData[uniqNameConference] = {
@@ -252,8 +252,8 @@ export class CallControllerController {
         statusEvents: [ConferenceType.start, ConferenceType.end, ConferenceType.join, ConferenceType.leave],
         statusHook: "/call-controller/conference-status",
       });
-      redisConferenceCallingData[conferenceName].isOneOfMemberAnswer = true;
       res.status(200).json(app);
+      redisConferenceCallingData[conferenceName].isOneOfMemberAnswer = true;
     } catch (err) {
       console.log("🚀 ~ file: call-controller.controller.ts:86 ~ CallControllerController ~ callerCreateConference ~ err:", err);
       res.sendStatus(503);
