@@ -25,3 +25,10 @@ export interface IConfCall {
   callerCallId?: string;
   members: ILegMember[];
 }
+
+export interface ITypeOfToUser {
+  type: string;
+  name?: string;
+  sipUri?: string;
+  number?: string;
+}
