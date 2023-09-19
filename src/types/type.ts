@@ -21,9 +21,11 @@ export interface ILegMember {
 
 export interface IConfCall {
   confUniqueName: string;
+  masterCallId: string;
   status: ConfCallStatus;
   callerCallId?: string;
   members: ILegMember[];
+  currentMemberInConf: number;
 }
 
 export interface ITypeOfToUser {

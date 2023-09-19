@@ -6,11 +6,14 @@ const jambonz = require("@jambonz/node-client");
 const axios = require("axios");
 import { IUpdateConferenceOption, IToUserType, ILegMember, IConfCall, ITypeOfToUser } from "./../types/type";
 import { ConfCallStatus, MemberType, LegMemberStatus, ConferenceType } from "./../enums/enum";
+import { CallControllerService } from "./call-controller.service";
 
 const redisConferenceCallingData = {};
 
 @Controller("call-controller")
 export class CallControllerController {
+  constructor(private callControllerService: CallControllerService) {}
+
   private client: any = jambonz(process.env.JAMBONZ_ACCOUNT_SID, process.env.JAMBONZ_API_KEY, {
     baseUrl: process.env.JAMBONZ_REST_API_BASE_URL,
   });
@@ -37,7 +40,6 @@ export class CallControllerController {
       const { from } = req.body;
       // create unique name for conference
       const uniqNameConference = getUniqConferenceName();
-      console.log("🚀 ~ file: call-controller.controller.ts:53 ~ CallControllerController ~ callerCreateConference ~ uniqNameConference:", uniqNameConference);
       const app = new WebhookResponse();
       // enable recording.
       // app.config({
@@ -124,7 +126,7 @@ export class CallControllerController {
                 callId: callRingingSid,
                 type: MemberType.USER,
                 status: LegMemberStatus.calling,
-                value: member?.name || member?.sipUri || member?.number,
+                value: member?.name,
               };
               members.push(memberData);
             }),
@@ -156,18 +158,18 @@ export class CallControllerController {
       let fromDid = "";
       if (from === "test8") fromDid = "16164413854";
       if (from === "test8sub") fromDid = "16164399715";
-      if (isPhoneNumberOrSIP(to) === "sip") {
-        toUser.type = "user";
+      if (isPhoneNumberOrSIP(to) === MemberType.SIP_USER) {
+        toUser.type = to.includes(process.env.CHATCHILLA_SIP_DOMAIN) ? MemberType.USER : MemberType.SIP_USER;
         toUser.name = to;
       } else {
         if (to === "16164413854") {
-          toUser.type = "user";
+          toUser.type = MemberType.USER;
           toUser.name = "test8@voice.chatchilladev.sip.jambonz.cloud";
         } else if (to === "16164399715") {
-          toUser.type = "user";
+          toUser.type = MemberType.USER;
           toUser.name = "test8sub@voice.chatchilladev.sip.jambonz.cloud";
         } else {
-          toUser.type = "phone";
+          toUser.type = MemberType.EXTERNAL_PHONE;
           toUser.number = to.length <= 10 ? `1${to}` : to;
         }
       }
@@ -388,28 +390,24 @@ export class CallControllerController {
   async conferenceStatus(@Req() req: Request, @Res() res: Response): Promise<any> {
     try {
       const { body } = req;
-      const { conference_sid, event, members, friendly_name, call_sid } = body;
+      const { conference_sid, event, members, friendly_name, call_sid, to } = body;
       console.log("🚀 ~ file: call-controller.controller.ts:258 ~ CallControllerController ~ conferenceStatus:", body);
       const listPhoneFirstInviteRinging = redisConferenceCallingData[friendly_name]?.listPhoneFirstInviteRinging || [];
-      console.log(
-        "🚀 ~ file: call-controller.controller.ts:395 ~ CallControllerController ~ conferenceStatus ~ redisConferenceCallingData[friendly_name]:",
-        redisConferenceCallingData[friendly_name],
-      );
       const newMembers = redisConferenceCallingData[friendly_name]?.members || [];
       newMembers.forEach((m: ILegMember) => {
         if (call_sid === m.callId) {
           m.status = LegMemberStatus[event];
         }
       });
-      console.log(
-        "🚀 ~ file: call-controller.controller.ts:366 ~ CallControllerController ~ conferenceStatus ~ redisConferenceCallingData[friendly_name]:",
-        redisConferenceCallingData[friendly_name],
-      );
-      if (redisConferenceCallingData[friendly_name]?.members) redisConferenceCallingData[friendly_name].members = newMembers;
+      if (redisConferenceCallingData[friendly_name]?.members) {
+        redisConferenceCallingData[friendly_name].members = newMembers;
+        redisConferenceCallingData[friendly_name].currentMemberInConf = members;
+      }
       if (event === ConferenceType.START) {
         redisConferenceCallingData[friendly_name].status = ConfCallStatus.START;
+        redisConferenceCallingData[friendly_name].masterCallId = call_sid;
         redisConferenceCallingData[friendly_name].fallOverTimeOut = setTimeout(async () => {
-          const response = await axios.put(
+          await axios.put(
             `${process.env.JAMBONZ_REST_API_BASE_URL}/Accounts/${process.env.JAMBONZ_ACCOUNT_SID}/Calls/${call_sid}`,
             { call_hook: `${process.env.BACKEND_URL}/call-controller/conference-wait-hook` },
             {
@@ -420,24 +418,26 @@ export class CallControllerController {
           );
         }, 60000);
       }
+      if (event === ConferenceType.JOIN && call_sid !== redisConferenceCallingData[friendly_name]?.masterCallId) {
+        const currentMemberCallSids = redisConferenceCallingData[friendly_name]?.members.map((member: ILegMember) => member.callId);
+        if (!currentMemberCallSids.includes(call_sid)) {
+          redisConferenceCallingData[friendly_name]?.members.push({
+            callId: call_sid,
+            type: isPhoneNumberOrSIP(to) === MemberType.SIP_USER ? MemberType.USER : MemberType.EXTERNAL_PHONE,
+            status: LegMemberStatus.join,
+            value: to,
+          });
+        }
+      }
       if (event === ConferenceType.JOIN && members > 1 && listPhoneFirstInviteRinging.includes(call_sid)) {
         clearTimeout(redisConferenceCallingData[friendly_name].fallOverTimeOut);
         redisConferenceCallingData[friendly_name].fallOverTimeOut = null;
         if (!redisConferenceCallingData[friendly_name]?.isOutboundCall) {
           const filterAcceptCallSid = listPhoneFirstInviteRinging.filter((ringingCall: string) => ringingCall !== call_sid);
-          Promise.all(
-            filterAcceptCallSid.map(async (call: string) => {
-              await axios.put(
-                `${process.env.JAMBONZ_REST_API_BASE_URL}/Accounts/${process.env.JAMBONZ_ACCOUNT_SID}/Calls/${call}`,
-                { call_status: "no-answer" },
-                {
-                  headers: {
-                    Authorization: `Bearer ${process.env.JAMBONZ_API_KEY}`,
-                  },
-                },
-              );
-            }),
-          );
+          await this.callControllerService.endAllRingingCall(filterAcceptCallSid);
+          redisConferenceCallingData[friendly_name]?.members.forEach((member: ILegMember) => {
+            if (filterAcceptCallSid.includes(member.callId)) member.status = LegMemberStatus.leave;
+          });
         }
       }
       if ((event === ConferenceType.LEAVE && members === 0) || event === ConferenceType.END) {
@@ -445,8 +445,17 @@ export class CallControllerController {
           clearTimeout(redisConferenceCallingData[friendly_name].fallOverTimeOut);
           redisConferenceCallingData[friendly_name].fallOverTimeOut = null;
         }
+        const filterRingingCallSid = redisConferenceCallingData[friendly_name]?.members
+          .filter((member: ILegMember) => member.status == LegMemberStatus.calling)
+          .map((member: ILegMember) => member.callId);
+        await this.callControllerService.endAllRingingCall(filterRingingCallSid);
+        redisConferenceCallingData[friendly_name]?.members.forEach((member: ILegMember) => (member.status = LegMemberStatus.leave));
         redisConferenceCallingData[friendly_name].status = ConfCallStatus.END;
       }
+      console.log(
+        "🚀 ~ file: call-controller.controller.ts:397 ~ CallControllerController ~ conferenceStatus ~ redisConferenceCallingData[friendly_name]:",
+        redisConferenceCallingData[friendly_name],
+      );
       res.sendStatus(200);
     } catch (error) {
       console.log("🚀 ~ file: call-controller.controller.ts:362 ~ CallControllerController ~ conferenceStatus ~ error:", error);
