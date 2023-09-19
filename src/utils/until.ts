@@ -1,6 +1,9 @@
 export const getUniqConferenceName = () => {
   return `conference-${(Math.random() + 1).toString(36).substring(7)}`;
 };
+export const getUniqConferenceNameTimeout = () => {
+  return `conference-timeout-${(Math.random() + 1).toString(36).substring(7)}`;
+};
 
 export const isPhoneNumberOrSIP = (input: string) => {
   // Regular expression pattern for phone numbers
