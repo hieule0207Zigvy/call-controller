@@ -20,12 +20,14 @@ export interface ILegMember {
 }
 
 export interface IConfCall {
+  isOneOfMemberAnswer: boolean;
   confUniqueName: string;
   masterCallId: string;
   status: ConfCallStatus;
   callerCallId?: string;
   members: ILegMember[];
   currentMemberInConf: number;
+  fallOverTimeOut?: any;
 }
 
 export interface ITypeOfToUser {
