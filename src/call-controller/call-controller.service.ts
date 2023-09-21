@@ -12,31 +12,38 @@ export class CallControllerService {
   private fallOverTimeOutList = {};
 
   async endAllRingingCall(callSids: string[]): Promise<any> {
-    return Promise.all(
-      callSids.map(async (callSid: string) => {
-        await axios.put(
-          `${process.env.JAMBONZ_REST_API_BASE_URL}/Accounts/${process.env.JAMBONZ_ACCOUNT_SID}/Calls/${callSid}`,
-          { call_status: "no-answer" },
-          {
-            headers: {
-              Authorization: `Bearer ${process.env.JAMBONZ_API_KEY}`,
+    try {
+      Promise.all(
+        callSids.map(async (callSid: string) => {
+          await axios.put(
+            `${process.env.JAMBONZ_REST_API_BASE_URL}/Accounts/${process.env.JAMBONZ_ACCOUNT_SID}/Calls/${callSid}`,
+            { call_status: "no-answer" },
+            {
+              headers: {
+                Authorization: `Bearer ${process.env.JAMBONZ_API_KEY}`,
+              },
             },
-          },
-        );
-      }),
-    );
+          );
+        }),
+      );
+      return true;
+    } catch (error) {
+      console.log("🚀 ~ file: call-controller.service.ts:30 ~ CallControllerService ~ endAllRingingCall ~ error:", error);
+      return true;
+    }
   }
 
   pushTimeOut = (timeout, masterCallId: string) => {
-    this.fallOverTimeOutList[masterCallId] = timeout;
-    console.log("🚀 ~ file: call-controller.service.ts:32 ~ CallControllerService ~ this.fallOverTimeOutList:", this.fallOverTimeOutList);
-    return true;
+    return (this.fallOverTimeOutList[masterCallId] = timeout);
   };
 
   removeAndClearTimeout = (masterCallId: string) => {
     clearTimeout(this.fallOverTimeOutList[masterCallId]);
-    _.omit(this.fallOverTimeOutList, [masterCallId]);
-    console.log("🚀 ~ file: call-controller.service.ts:38 ~ CallControllerService ~ this.fallOverTimeOutList:", this.fallOverTimeOutList);
-    return true;
+    const newList = _.omit(this.fallOverTimeOutList, [masterCallId]);
+    return this.setFallOverTimeOutList(newList);
+  };
+
+  setFallOverTimeOutList = (fallOverTimeOutList: []) => {
+    return (this.fallOverTimeOutList = fallOverTimeOutList);
   };
 }

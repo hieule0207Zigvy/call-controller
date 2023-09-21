@@ -24,10 +24,10 @@ export interface IConfCall {
   confUniqueName: string;
   masterCallId: string;
   status: ConfCallStatus;
-  callerCallId?: string;
   members: ILegMember[];
   currentMemberInConf: number;
-  fallOverTimeOut?: any;
+  fallOverTimeOut: string;
+  isOutboundCall: boolean,
 }
 
 export interface ITypeOfToUser {

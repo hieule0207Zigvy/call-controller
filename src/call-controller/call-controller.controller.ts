@@ -39,13 +39,12 @@ export class CallControllerController {
     Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged. It was popularised in the 1960s with the release of Letraset sheets containing Lorem Ipsum passages, and more recently with desktop publishing software like Aldus PageMaker including versions of Lorem Ipsum.
     </speak>`;
     const app = new WebhookResponse();
-    app.say({ text });
+    // app.say({ text });
     res.status(200).json(app);
   }
   // call inbound
   @Post("caller-create-conference")
   async callerCreateConference(@Req() req: Request, @Res() res: Response): Promise<any> {
-    console.log("🚀 ~ file: call-controller.controller.ts:48 ~ CallControllerController ~ callerCreateConference ~ callerCreateConference")
     try {
       const { from } = req.body;
       // create unique name for conference
@@ -63,34 +62,33 @@ export class CallControllerController {
       // call api to chatchilla to get all did.
       //if from is one of did of chatchilla, do nothing. Already handle in agent create conference.
       if (from !== "16164413854" && from !== "16164399715") {
-        app
-          .say({
-            text: "Hello You are calling to Group ONE, We are calling to all members to of this group",
-            synthesizer: {
-              vendor: "google",
-              language: "en-US",
-            },
-          })
-          .conference({
-            name: uniqNameConference,
-            statusEvents: [ConferenceType.END, ConferenceType.JOIN, ConferenceType.START, ConferenceType.LEAVE],
-            statusHook: "/call-controller/conference-status",
-            startConferenceOnEnter: true,
-            endConferenceOnExit: true,
-          });
+        // app.say({
+        //   text: "Hello You are calling to Group ONE, We are calling to all members to of this group",
+        //   synthesizer: {
+        //     vendor: "google",
+        //     language: "en-US",
+        //   },
+        // })
+        app.conference({
+          name: uniqNameConference,
+          statusEvents: [ConferenceType.END, ConferenceType.JOIN, ConferenceType.START, ConferenceType.LEAVE],
+          statusHook: "/call-controller/conference-status",
+          startConferenceOnEnter: true,
+          endConferenceOnExit: true,
+        });
         // conference created
         res.status(200).json(app);
-        // await this.cacheManager.set(
-        //   `${process.env.REDIS_CALL_SERVER_PREFIX}-${uniqNameConference}`,
-        //   {
-        //     isOneOfMemberAnswer: false,
-        //     confUniqueName: uniqNameConference,
-        //     isOutboundCall: false,
-        //     members: [],
-        //     listPhoneFirstInviteRinging: [],
-        //   },
-        //   172800,
-        // );
+        const initCallLog: IConfCall = {
+          isOneOfMemberAnswer: false,
+          confUniqueName: uniqNameConference,
+          masterCallId: "",
+          status: ConfCallStatus.START,
+          members: [],
+          currentMemberInConf: 0,
+          fallOverTimeOut: "",
+          isOutboundCall: false,
+        };
+        await this.cacheManager.set(`${process.env.REDIS_CALL_SERVER_PREFIX}-${uniqNameConference}`, initCallLog, 172800);
         redisConferenceCallingData[uniqNameConference] = {
           isOneOfMemberAnswer: false,
           confUniqueName: uniqNameConference,
@@ -141,7 +139,6 @@ export class CallControllerController {
                 speech_synthesis_voice: "en-US-Standard-C",
                 speech_recognizer_vendor: "google",
                 speech_recognizer_language: "en-US",
-                timeout: 55,
               });
               listPhoneFirstInviteRinging.push(callRingingSid);
               const memberData = {
@@ -154,27 +151,25 @@ export class CallControllerController {
             }),
           )
             .then(async values => {
+              const currentCallLog: IConfCall = await this.cacheManager.get(`${process.env.REDIS_CALL_SERVER_PREFIX}-${uniqNameConference}`);
               redisConferenceCallingData[uniqNameConference] = {
                 ...redisConferenceCallingData[uniqNameConference],
                 ...{ listPhoneFirstInviteRinging: listPhoneFirstInviteRinging, members: members },
               };
-              // await this.cacheManager.set(
-              //   `${process.env.REDIS_CALL_SERVER_PREFIX}-${uniqNameConference}`,
-              //   {
-              //     isOneOfMemberAnswer: false,
-              //     confUniqueName: uniqNameConference,
-              //     isOutboundCall: false,
-              //     members,
-              //     listPhoneFirstInviteRinging,
-              //   },
-              //   172800,
-              // );
+              await this.cacheManager.set(
+                `${process.env.REDIS_CALL_SERVER_PREFIX}-${uniqNameConference}`,
+                {
+                  ...currentCallLog,
+                  ...{ members, listPhoneFirstInviteRinging },
+                },
+                172800,
+              );
             })
             .catch(err => {
               console.log("🚀 ~ file: call-controller.controller.ts:85 ~ CallControllerController ~ callerCreateConference ~ err:", err);
               res.sendStatus(503);
             });
-        }, 2000);
+        }, 7000);
       } else res.status(200);
     } catch (err) {
       console.log("🚀 ~ file: call-controller.controller.ts:86 ~ CallControllerController ~ callerCreateConference ~ err:", err);
@@ -224,17 +219,17 @@ export class CallControllerController {
         endConferenceOnExit: true,
       }); // conference created.
 
-      await this.cacheManager.set(
-        `${process.env.REDIS_CALL_SERVER_PREFIX}-${uniqNameConference}`,
-        {
-          isOneOfMemberAnswer: false,
-          confUniqueName: uniqNameConference,
-          isOutboundCall: false,
-          members: [],
-          listPhoneFirstInviteRinging: [],
-        },
-        172800,
-      );
+      const initCallLog: IConfCall = {
+        isOneOfMemberAnswer: false,
+        confUniqueName: uniqNameConference,
+        masterCallId: "",
+        status: ConfCallStatus.START,
+        members: [],
+        currentMemberInConf: 0,
+        fallOverTimeOut: "",
+        isOutboundCall: true,
+      };
+      await this.cacheManager.set(`${process.env.REDIS_CALL_SERVER_PREFIX}-${uniqNameConference}`, initCallLog, 172800);
       redisConferenceCallingData[uniqNameConference] = {
         isOneOfMemberAnswer: false,
         confUniqueName: uniqNameConference,
@@ -270,14 +265,12 @@ export class CallControllerController {
           value: toUser?.name || toUser?.number,
         };
         redisConferenceCallingData[uniqNameConference].members = [memberData];
+        const currentCallLog: IConfCall = await this.cacheManager.get(`${process.env.REDIS_CALL_SERVER_PREFIX}-${uniqNameConference}`);
         await this.cacheManager.set(
           `${process.env.REDIS_CALL_SERVER_PREFIX}-${uniqNameConference}`,
           {
-            isOneOfMemberAnswer: false,
-            confUniqueName: uniqNameConference,
-            isOutboundCall: false,
-            members: [memberData],
-            listPhoneFirstInviteRinging: [log],
+            ...currentCallLog,
+            ...{ members: [memberData], listPhoneFirstInviteRinging: [log] },
           },
           172800,
         );
@@ -405,8 +398,7 @@ export class CallControllerController {
       res.status(200).json(app);
       redisConferenceCallingData[conferenceName].isOneOfMemberAnswer = true;
       const currentCallLog: IConfCall = await this.cacheManager.get(`${process.env.REDIS_CALL_SERVER_PREFIX}-${conferenceName}`);
-      currentCallLog.isOneOfMemberAnswer = true;
-      await this.cacheManager.set(`${process.env.REDIS_CALL_SERVER_PREFIX}-${conferenceName}`, currentCallLog, 172800);
+      await this.cacheManager.set(`${process.env.REDIS_CALL_SERVER_PREFIX}-${conferenceName}`, { ...currentCallLog, ...{ isOneOfMemberAnswer: true } }, 172800);
     } catch (err) {
       console.log("🚀 ~ file: call-controller.controller.ts:86 ~ CallControllerController ~ callerCreateConference ~ err:", err);
       res.sendStatus(503);
@@ -416,13 +408,13 @@ export class CallControllerController {
   @Post("conference-wait-hook")
   conferenceWaitHook(@Req() req: Request, @Res() res: Response): any {
     const app = new WebhookResponse();
-    app.say({
-      text: "No one pickup the phone, the call will be hang up automatically",
-      synthesizer: {
-        vendor: "google",
-        language: "en-US",
-      },
-    });
+    // app.say({
+    //   text: "No one pickup the phone, the call will be hang up automatically",
+    //   synthesizer: {
+    //     vendor: "google",
+    //     language: "en-US",
+    //   },
+    // });
     res.status(200).json(app);
   }
 
@@ -434,7 +426,7 @@ export class CallControllerController {
     We shall search far and wide to find just the right person for you.
     So please do continue to wait just a bit longer, if you would.`;
     const app = new WebhookResponse();
-    app.say({ text });
+    // app.say({ text });
     res.status(200).json(app);
   }
   // status logger
@@ -450,7 +442,9 @@ export class CallControllerController {
     try {
       const { body } = req;
       const { conference_sid, event, members, friendly_name, call_sid, to } = body;
-      console.log("🚀 ~ file: call-controller.controller.ts:258 ~ CallControllerController ~ conferenceStatus:", body);
+      if (!event) return res.sendStatus(200);
+      console.log("🚀 ~ file: call-controller.controller.ts:447 ~ CallControllerController ~ conferenceStatus ~ event:", body);
+      // console.log("🚀 ~ file: call-controller.controller.ts:258 ~ CallControllerController ~ conferenceStatus:", body);
       const currentCallLog: IConfCall = await this.cacheManager.get(`${process.env.REDIS_CALL_SERVER_PREFIX}-${friendly_name}`);
       const listPhoneFirstInviteRinging = redisConferenceCallingData[friendly_name]?.listPhoneFirstInviteRinging || [];
       const newMembers = redisConferenceCallingData[friendly_name]?.members || [];
@@ -459,16 +453,20 @@ export class CallControllerController {
           m.status = LegMemberStatus[event];
         }
       });
-      if (redisConferenceCallingData[friendly_name]?.members) {
-        redisConferenceCallingData[friendly_name].members = newMembers;
-        redisConferenceCallingData[friendly_name].currentMemberInConf = members;
-        currentCallLog.members = newMembers;
-        currentCallLog.currentMemberInConf = members;
-        await this.cacheManager.set(`${process.env.REDIS_CALL_SERVER_PREFIX}-${friendly_name}`, currentCallLog, 172800);
-      }
+      redisConferenceCallingData[friendly_name].members = newMembers;
+      redisConferenceCallingData[friendly_name].currentMemberInConf = members;
+      await this.cacheManager.set(
+        `${process.env.REDIS_CALL_SERVER_PREFIX}-${friendly_name}`,
+        {
+          ...currentCallLog,
+          ...{ members: newMembers, currentMemberInConf: members },
+        },
+        172800,
+      );
       if (event === ConferenceType.START) {
         redisConferenceCallingData[friendly_name].status = ConfCallStatus.START;
         redisConferenceCallingData[friendly_name].masterCallId = call_sid;
+
         const timeoutFallOverFunc = setTimeout(async () => {
           await axios.put(
             `${process.env.JAMBONZ_REST_API_BASE_URL}/Accounts/${process.env.JAMBONZ_ACCOUNT_SID}/Calls/${call_sid}`,
@@ -483,10 +481,12 @@ export class CallControllerController {
 
         redisConferenceCallingData[friendly_name].fallOverTimeOut = timeoutFallOverFunc;
         this.callControllerService.pushTimeOut(timeoutFallOverFunc, call_sid);
-        currentCallLog.status = ConfCallStatus.START;
-        currentCallLog.masterCallId = call_sid;
-        currentCallLog.fallOverTimeOut = call_sid;
-        await this.cacheManager.set(`${process.env.REDIS_CALL_SERVER_PREFIX}-${friendly_name}`, currentCallLog, 172800);
+
+        await this.cacheManager.set(
+          `${process.env.REDIS_CALL_SERVER_PREFIX}-${friendly_name}`,
+          { ...currentCallLog, ...{ status: ConfCallStatus.START, masterCallId: call_sid, fallOverTimeOut: call_sid } },
+          172800,
+        );
       }
       if (event === ConferenceType.JOIN && call_sid !== redisConferenceCallingData[friendly_name]?.masterCallId) {
         const currentMemberCallSids = redisConferenceCallingData[friendly_name]?.members.map((member: ILegMember) => member.callId);
@@ -503,43 +503,56 @@ export class CallControllerController {
             status: LegMemberStatus.join,
             value: to,
           });
-          await this.cacheManager.set(`${process.env.REDIS_CALL_SERVER_PREFIX}-${friendly_name}`, currentCallLog, 172800);
+          await this.cacheManager.set(`${process.env.REDIS_CALL_SERVER_PREFIX}-${friendly_name}`, { currentCallLog }, 172800);
         }
       }
       if (event === ConferenceType.JOIN && members > 1 && listPhoneFirstInviteRinging.includes(call_sid)) {
         clearTimeout(redisConferenceCallingData[friendly_name].fallOverTimeOut);
+
         this.callControllerService.removeAndClearTimeout(currentCallLog?.fallOverTimeOut);
         redisConferenceCallingData[friendly_name].fallOverTimeOut = null;
-        currentCallLog.fallOverTimeOut = null;
+
         if (!redisConferenceCallingData[friendly_name]?.isOutboundCall) {
           const filterAcceptCallSid = listPhoneFirstInviteRinging.filter((ringingCall: string) => ringingCall !== call_sid);
           await this.callControllerService.endAllRingingCall(filterAcceptCallSid);
+
           redisConferenceCallingData[friendly_name]?.members.forEach((member: ILegMember) => {
             if (filterAcceptCallSid.includes(member.callId)) member.status = LegMemberStatus.leave;
           });
         }
-        await this.cacheManager.set(`${process.env.REDIS_CALL_SERVER_PREFIX}-${friendly_name}`, currentCallLog, 172800);
+
+        await this.cacheManager.set(
+          `${process.env.REDIS_CALL_SERVER_PREFIX}-${friendly_name}`,
+          { ...currentCallLog, ...{ fallOverTimeOut: null, currentMemberInConf: members } },
+          172800,
+        );
       }
       if ((event === ConferenceType.LEAVE && members === 0) || event === ConferenceType.END) {
         if (redisConferenceCallingData[friendly_name].fallOverTimeOut) {
           clearTimeout(redisConferenceCallingData[friendly_name].fallOverTimeOut);
           this.callControllerService.removeAndClearTimeout(currentCallLog?.fallOverTimeOut);
           redisConferenceCallingData[friendly_name].fallOverTimeOut = null;
-          currentCallLog.fallOverTimeOut = null;
         }
         const filterRingingCallSid = redisConferenceCallingData[friendly_name]?.members
           .filter((member: ILegMember) => member.status == LegMemberStatus.calling)
           .map((member: ILegMember) => member.callId);
         await this.callControllerService.endAllRingingCall(filterRingingCallSid);
+
         redisConferenceCallingData[friendly_name]?.members.forEach((member: ILegMember) => (member.status = LegMemberStatus.leave));
         redisConferenceCallingData[friendly_name].status = ConfCallStatus.END;
-        currentCallLog.members.map((member: ILegMember) => (member.status = LegMemberStatus.leave));
-        currentCallLog.status = ConfCallStatus.END;
-        await this.cacheManager.set(`${process.env.REDIS_CALL_SERVER_PREFIX}-${friendly_name}`, currentCallLog, 172800);
+
+        const newMember = currentCallLog.members;
+        newMember.forEach((member: ILegMember) => (member.status = LegMemberStatus.leave));
+        await this.cacheManager.set(
+          `${process.env.REDIS_CALL_SERVER_PREFIX}-${friendly_name}`,
+          { ...currentCallLog, ...{ status: ConfCallStatus.END, members: newMember, fallOverTimeOut: null, currentMemberInConf: members } },
+          172800,
+        );
       }
       res.sendStatus(200);
     } catch (error) {
-      console.log("🚀 ~ file: call-controller.controller.ts:362 ~ CallControllerController ~ conferenceStatus ~ error:", error);
+      console.log("🚀 ~ file: call-controller.controller.ts:362 ~ CallControllerController ~ conferenceStatus ~ error:", error?.response?.data?.msg);
+      console.log("🚀 ~ file: call-controller.controller.ts:362 ~ CallControllerController ~ conferenceStatus ~ error:", error?.response);
       res.sendStatus(503);
     }
   }
