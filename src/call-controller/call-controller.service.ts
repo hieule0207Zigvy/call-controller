@@ -1,15 +1,21 @@
-import { Injectable } from "@nestjs/common";
+import { Inject, Injectable } from "@nestjs/common";
 import { LegMemberStatus } from "src/enums/enum";
-import { ILegMember } from "src/types/type";
+import { IConfCall, ILegMember } from "src/types/type";
 const jambonz = require("@jambonz/node-client");
 import axios from "axios";
+import { CACHE_MANAGER } from "@nestjs/cache-manager";
 var _ = require("lodash");
+import { Cache } from "cache-manager";
+import { Timer } from "./../utils/Timer";
+
 @Injectable()
 export class CallControllerService {
+  constructor(@Inject(CACHE_MANAGER) private cacheManager: Cache) {}
   private client: any = jambonz(process.env.JAMBONZ_ACCOUNT_SID, process.env.JAMBONZ_API_KEY, {
     baseUrl: process.env.JAMBONZ_REST_API_BASE_URL,
   });
   private fallOverTimeOutList = {};
+  private expiredTime = 3 * Timer.month;
 
   async endAllRingingCall(callSids: string[]): Promise<any> {
     try {
@@ -33,7 +39,7 @@ export class CallControllerService {
     }
   }
 
-  pushTimeOut = (timeout, masterCallId: string) => {
+  pushTimeOut = (timeout: any, masterCallId: string) => {
     return (this.fallOverTimeOutList[masterCallId] = timeout);
   };
 
@@ -45,5 +51,17 @@ export class CallControllerService {
 
   setFallOverTimeOutList = (fallOverTimeOutList: []) => {
     return (this.fallOverTimeOutList = fallOverTimeOutList);
+  };
+
+  setCallLogToRedis = async (callLogKey: string, newCallLog: any, currentCallLog: IConfCall) => {
+    if (currentCallLog) {
+      return this.cacheManager.set(`${process.env.REDIS_CALL_SERVER_PREFIX}-${callLogKey}`, { ...currentCallLog, ...newCallLog }, this.expiredTime);
+    }
+    return this.cacheManager.set(`${process.env.REDIS_CALL_SERVER_PREFIX}-${callLogKey}`, newCallLog, this.expiredTime);
+  };
+
+  getCallLogOfCall = async (callLogKey: string) => {
+    const result: IConfCall = await this.cacheManager.get(`${process.env.REDIS_CALL_SERVER_PREFIX}-${callLogKey}`);
+    return result;
   };
 }

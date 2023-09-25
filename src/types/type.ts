@@ -17,6 +17,7 @@ export interface ILegMember {
   type: MemberType;
   value: string;
   status: LegMemberStatus;
+  eventTime?: Date;
 }
 
 export interface IConfCall {
@@ -27,7 +28,10 @@ export interface IConfCall {
   members: ILegMember[];
   currentMemberInConf: number;
   fallOverTimeOut: string;
-  isOutboundCall: boolean,
+  isOutboundCall: boolean;
+  listPhoneFirstInviteRinging: string[];
+  conversationId?: string;
+  eventTime?: string;
 }
 
 export interface ITypeOfToUser {
