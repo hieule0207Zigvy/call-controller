@@ -17,15 +17,21 @@ export interface ILegMember {
   type: MemberType;
   value: string;
   status: LegMemberStatus;
+  eventTime?: Date;
 }
 
 export interface IConfCall {
+  isOneOfMemberAnswer: boolean;
   confUniqueName: string;
   masterCallId: string;
   status: ConfCallStatus;
-  callerCallId?: string;
   members: ILegMember[];
   currentMemberInConf: number;
+  fallOverTimeOut: string;
+  isOutboundCall: boolean;
+  listPhoneFirstInviteRinging: string[];
+  conversationId?: string;
+  eventTime?: string;
 }
 
 export interface ITypeOfToUser {
