@@ -41,32 +41,48 @@ export class CallControllerController {
       // create unique name for conference
       const uniqNameConference = getUniqConferenceName();
       const app = new WebhookResponse();
-      // enable recording.
-      // app.config({
-      //   listen: {
-      //     url: `${process.env.WEBSOCKET_URL}${process.env.WS_RECORD_PATH}`,
-      //     mixType: "stereo",
-      //     enable: true,
-      //   },
-      // });
-      // end record
+
       // call api to chatchilla to get all did.
       //if from is one of did of chatchilla, do nothing. Already handle in agent create conference.
       if (from !== "16164413854" && from !== "16164399715") {
-        // app.say({
-        //   text: "Hello You are calling to Group ONE, We are calling to all members to of this group",
-        //   synthesizer: {
-        //     vendor: "google",
-        //     language: "en-US",
+        // enable recording.
+        // app.config({
+        //   listen: {
+        //     url: `${process.env.WEBSOCKET_URL}${process.env.WS_RECORD_PATH}`,
+        //     mixType: "stereo",
+        //     enable: true,
         //   },
-        // })
-        app.conference({
-          name: uniqNameConference,
-          statusEvents: [ConferenceType.END, ConferenceType.JOIN, ConferenceType.START, ConferenceType.LEAVE],
-          statusHook: "/call-controller/conference-status",
-          startConferenceOnEnter: true,
-          endConferenceOnExit: true,
-        });
+        // });
+        // end record
+        app
+          .tag({
+            data: {
+              listMember: [
+                {
+                  type: "user",
+                  name: "test8@voice.chatchilladev.sip.jambonz.cloud",
+                },
+                {
+                  type: "user",
+                  name: "test8sub@voice.chatchilladev.sip.jambonz.cloud",
+                },
+              ],
+              uniqNameConference,
+              from,
+            },
+          })
+          .play({
+            // url: "",
+            url: "https://smartonhold.com.au/wp-content/uploads/2021/11/FEMALE-DEMO-1-Monica-Devine-5-11-21.mp3",
+            actionHook: "/call-controller/call-hook",
+          })
+          .conference({
+            name: uniqNameConference,
+            statusEvents: [ConferenceType.END, ConferenceType.JOIN, ConferenceType.START, ConferenceType.LEAVE],
+            statusHook: "/call-controller/conference-status",
+            startConferenceOnEnter: true,
+            endConferenceOnExit: true,
+          });
         // conference created
         res.status(200).json(app);
         const initCallLog: IConfCall = {
@@ -82,70 +98,6 @@ export class CallControllerController {
           eventTime: "",
         };
         await this.callControllerService.setCallLogToRedis(uniqNameConference, initCallLog, null);
-        const listMember = [
-          {
-            type: "user",
-            name: "test8@voice.chatchilladev.sip.jambonz.cloud",
-          },
-          {
-            type: "user",
-            name: "test8sub@voice.chatchilladev.sip.jambonz.cloud",
-          },
-        ];
-        // const listMember = [
-        //   // {
-        //   //   type: "user",
-        //   //   name: "test8@voice.chatchilladev.sip.jambonz.cloud",
-        //   // },
-        //   {
-        //     type: "sip",
-        //     sipUri: "sip:hieule0207@sip.linphone.org",
-        //   },
-        // ];
-        const listPhoneFirstInviteRinging = [];
-        const members = [];
-        setTimeout(() => {
-          Promise.all(
-            listMember.map(async (member: ITypeOfToUser) => {
-              const callRingingSid = await this.client.calls.create({
-                from: from,
-                to: member,
-                call_hook: {
-                  url: `${process.env.BACKEND_URL}/call-controller/person-join-conference/${uniqNameConference}`,
-                  method: "GET",
-                },
-                call_status_hook: {
-                  url: `${process.env.BACKEND_URL}/call-controller/call-status`,
-                  method: "POST",
-                },
-                fromHost: "voice.chatchilladev.sip.jambonz.cloud",
-                speech_synthesis_vendor: "google",
-                speech_synthesis_language: "en-US",
-                speech_synthesis_voice: "en-US-Standard-C",
-                speech_recognizer_vendor: "google",
-                speech_recognizer_language: "en-US",
-              });
-              listPhoneFirstInviteRinging.push(callRingingSid);
-              const memberData = {
-                callId: callRingingSid,
-                type: MemberType.USER,
-                status: LegMemberStatus.calling,
-                value: member?.name,
-                eventTime: "",
-              };
-              members.push(memberData);
-            }),
-          )
-            .then(async values => {
-              const currentCallLog: IConfCall = await this.callControllerService.getCallLogOfCall(uniqNameConference);
-              const newData = { members, listPhoneFirstInviteRinging };
-              await this.callControllerService.setCallLogToRedis(uniqNameConference, newData, currentCallLog);
-            })
-            .catch(err => {
-              console.log("🚀 ~ file: call-controller.controller.ts:85 ~ CallControllerController ~ callerCreateConference ~ err:", err);
-              res.sendStatus(503);
-            });
-        }, 7000);
       } else res.status(200);
     } catch (err) {
       console.log("🚀 ~ file: call-controller.controller.ts:86 ~ CallControllerController ~ callerCreateConference ~ err:", err);
@@ -496,5 +448,55 @@ export class CallControllerController {
       console.log("🚀 ~ file: call-controller.controller.ts:362 ~ CallControllerController ~ conferenceStatus ~ error:", error?.response);
       res.sendStatus(503);
     }
+  }
+  @Post("call-hook")
+  callHook(@Req() req: Request, @Res() res: Response): any {
+    const { body } = req;
+    console.log("🚀 ~ file: call-controller.controller.ts:505 ~ CallControllerController ~ callHook ~ body:", body);
+    const { customerData = {} } = body;
+    const { listMember = [], uniqNameConference, from } = customerData;
+    const listPhoneFirstInviteRinging = [];
+    const members = [];
+    Promise.all(
+      listMember.map(async (member: ITypeOfToUser) => {
+        const callRingingSid = await this.client.calls.create({
+          from: from,
+          to: member,
+          call_hook: {
+            url: `${process.env.BACKEND_URL}/call-controller/person-join-conference/${uniqNameConference}`,
+            method: "GET",
+          },
+          call_status_hook: {
+            url: `${process.env.BACKEND_URL}/call-controller/call-status`,
+            method: "POST",
+          },
+          fromHost: "voice.chatchilladev.sip.jambonz.cloud",
+          speech_synthesis_vendor: "google",
+          speech_synthesis_language: "en-US",
+          speech_synthesis_voice: "en-US-Standard-C",
+          speech_recognizer_vendor: "google",
+          speech_recognizer_language: "en-US",
+        });
+        listPhoneFirstInviteRinging.push(callRingingSid);
+        const memberData = {
+          callId: callRingingSid,
+          type: MemberType.USER,
+          status: LegMemberStatus.calling,
+          value: member?.name,
+          eventTime: "",
+        };
+        members.push(memberData);
+      }),
+    )
+      .then(async values => {
+        const currentCallLog: IConfCall = await this.callControllerService.getCallLogOfCall(uniqNameConference);
+        const newData = { members, listPhoneFirstInviteRinging };
+        await this.callControllerService.setCallLogToRedis(uniqNameConference, newData, currentCallLog);
+      })
+      .catch(err => {
+        console.log("🚀 ~ file: call-controller.controller.ts:85 ~ CallControllerController ~ callerCreateConference ~ err:", err);
+        res.sendStatus(503);
+      });
+    res.sendStatus(200);
   }
 }
