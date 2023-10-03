@@ -1,5 +1,5 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { LegMemberStatus } from "src/enums/enum";
+import { GroupCallSettingRingingType, LegMemberStatus, MemberType } from "src/enums/enum";
 import { IConfCall, ILegMember } from "src/types/type";
 const jambonz = require("@jambonz/node-client");
 import axios from "axios";
@@ -21,15 +21,17 @@ export class CallControllerService {
     try {
       Promise.all(
         callSids.map(async (callSid: string) => {
-          await axios.put(
-            `${process.env.JAMBONZ_REST_API_BASE_URL}/Accounts/${process.env.JAMBONZ_ACCOUNT_SID}/Calls/${callSid}`,
-            { call_status: "no-answer" },
-            {
-              headers: {
-                Authorization: `Bearer ${process.env.JAMBONZ_API_KEY}`,
+          await axios
+            .put(
+              `${process.env.JAMBONZ_REST_API_BASE_URL}/Accounts/${process.env.JAMBONZ_ACCOUNT_SID}/Calls/${callSid}`,
+              { call_status: "no-answer" },
+              {
+                headers: {
+                  Authorization: `Bearer ${process.env.JAMBONZ_API_KEY}`,
+                },
               },
-            },
-          );
+            )
+            .catch(err => console.log("🚀 ~ file: call-controller.service.ts:33 ~ CallControllerService ~ callSids.map ~ err:", err));
         }),
       );
       return true;
@@ -63,5 +65,175 @@ export class CallControllerService {
   getCallLogOfCall = async (callLogKey: string) => {
     const result: IConfCall = await this.cacheManager.get(`${process.env.REDIS_CALL_SERVER_PREFIX}-${callLogKey}`);
     return result;
+  };
+
+  getCallSettings = (callSettingData: any) => {
+    const memberNeedToCall = [];
+    let welcomeMedia = "";
+    let queueMedia = "";
+    let timeoutMedia = "";
+    let queueTimeout = "";
+    let voicemailTimeout = 60;
+    let voicemailMedia = "";
+    let fromNumber: string;
+    let isHangup = false;
+    let isEnableVoiceMail = false;
+    let isForwardCall = false;
+    let callForwardPhoneNumber = "";
+
+    const {
+      type,
+      call_setting_forward_phone,
+      external_number,
+      call_setting_member_id,
+      group,
+      call_setting_welcome_media,
+      queue_settings,
+      call_setting_role,
+      other_group,
+      owner,
+      call_setting_auto_record,
+    } = callSettingData;
+
+    const { members = [] } = group;
+    const memberInOtherGroup = other_group?.members;
+
+    switch (type) {
+      case GroupCallSettingRingingType.HANG_UP: {
+        isHangup = true;
+        if (call_setting_welcome_media) {
+          welcomeMedia = call_setting_welcome_media;
+        }
+        break;
+      }
+      case GroupCallSettingRingingType.CALL_FORWARDING: {
+        isForwardCall: true;
+        fromNumber: external_number.ani;
+        callForwardPhoneNumber = call_setting_forward_phone;
+        if (call_setting_welcome_media) {
+          welcomeMedia = call_setting_welcome_media;
+        }
+
+        break;
+      }
+      case GroupCallSettingRingingType.EXTERNAL_NUMBER: {
+        memberNeedToCall.push({
+          type: MemberType.EXTERNAL_PHONE,
+          number: external_number.phone_number,
+          fromNumber: external_number.ani,
+        });
+        if (call_setting_welcome_media) {
+          welcomeMedia = call_setting_welcome_media;
+        }
+        break;
+      }
+      case GroupCallSettingRingingType.MEMBER: {
+        members.forEach(member => {
+          if (call_setting_member_id.includes(member.id)) {
+            memberNeedToCall.push({ type: MemberType.USER, name: `${member?.trunk_sip_credential.username}${process.env.CHATCHILLA_SIP_DOMAIN}` });
+          }
+        });
+        if (call_setting_welcome_media) {
+          welcomeMedia = call_setting_welcome_media;
+          queueMedia = queue_settings.queue_media;
+          timeoutMedia = queue_settings.timeout_media;
+          queueTimeout = queue_settings.queue_timeout;
+          voicemailTimeout = queue_settings.voicemail_timeout;
+          voicemailMedia = queue_settings.voicemail_media;
+          isEnableVoiceMail = queue_settings.isVoiceMail;
+        }
+        break;
+      }
+      case GroupCallSettingRingingType.A_ROLE_IN_GROUP: {
+        members.forEach(member => {
+          if (member.roles(call_setting_role)) {
+            memberNeedToCall.push({ type: MemberType.USER, name: `${member?.trunk_sip_credential.username}${process.env.CHATCHILLA_SIP_DOMAIN}` });
+          }
+        });
+        if (call_setting_welcome_media) {
+          welcomeMedia = call_setting_welcome_media;
+        }
+        break;
+      }
+      case GroupCallSettingRingingType.GROUP: {
+        // members.forEach(member => {
+        //   memberNeedToCall.push({ type: MemberType.USER, name: `${member?.trunk_sip_credential.username}${process.env.CHATCHILLA_SIP_DOMAIN}` });
+        // }); // need migra with chatchilla so mocking sip account
+        memberNeedToCall.push({ type: MemberType.USER, name: `test8sub@${process.env.CHATCHILLA_SIP_DOMAIN}` });
+        if (call_setting_welcome_media) {
+          welcomeMedia = call_setting_welcome_media;
+          queueMedia = queue_settings.queue_media;
+          timeoutMedia = queue_settings.timeout_media;
+          queueTimeout = queue_settings.queue_timeout;
+          voicemailTimeout = queue_settings.voicemail_timeout;
+          voicemailMedia = queue_settings.voicemail_media;
+          isEnableVoiceMail = queue_settings.isVoiceMail;
+        }
+        break;
+      }
+      case GroupCallSettingRingingType.OTHER_GROUP: {
+        memberInOtherGroup.forEach(member => {
+          memberNeedToCall.push({ type: MemberType.USER, name: `${member?.trunk_sip_credential.username}${process.env.CHATCHILLA_SIP_DOMAIN}` });
+        });
+        if (call_setting_welcome_media) {
+          welcomeMedia = call_setting_welcome_media;
+          isEnableVoiceMail = queue_settings.isVoiceMail;
+        }
+        break;
+      }
+      case GroupCallSettingRingingType.MEMBER_AUTO_ASSIGN: {
+        members.forEach(member => {
+          if (member.auto_assign) memberNeedToCall.push({ type: MemberType.USER, name: `${member?.trunk_sip_credential.username}${process.env.CHATCHILLA_SIP_DOMAIN}` });
+        });
+        if (call_setting_welcome_media) {
+          welcomeMedia = call_setting_welcome_media;
+          queueMedia = queue_settings.queue_media;
+          timeoutMedia = queue_settings.timeout_media;
+          queueTimeout = queue_settings.queue_timeout;
+          voicemailTimeout = queue_settings.voicemail_timeout;
+          voicemailMedia = queue_settings.voicemail_media;
+          isEnableVoiceMail = queue_settings.isVoiceMail;
+        }
+        if (memberNeedToCall.length === 0)
+          // queue call
+          break;
+      }
+      case GroupCallSettingRingingType.OWNER: {
+        if (owner) {
+          memberNeedToCall.push({ type: MemberType.USER, name: `${owner?.trunk_sip_credential.username}${process.env.CHATCHILLA_SIP_DOMAIN}` });
+        } else {
+          members.forEach(member => {
+            memberNeedToCall.push({ type: MemberType.USER, name: `${owner?.trunk_sip_credential.username}${process.env.CHATCHILLA_SIP_DOMAIN}` });
+          });
+        }
+        if (call_setting_welcome_media) {
+          welcomeMedia = call_setting_welcome_media;
+          queueMedia = queue_settings.queue_media;
+          timeoutMedia = queue_settings.timeout_media;
+          queueTimeout = queue_settings.queue_timeout;
+          voicemailTimeout = queue_settings.voicemail_timeout;
+          voicemailMedia = queue_settings.voicemail_media;
+          isEnableVoiceMail = queue_settings.isVoiceMail;
+        }
+      }
+      default:
+        break;
+    }
+
+    return {
+      welcomeMedia,
+      queueMedia,
+      timeoutMedia,
+      voicemailMedia,
+      queueTimeout,
+      voicemailTimeout,
+      fromNumber,
+      isHangup,
+      memberNeedToCall,
+      isEnableRecord: call_setting_auto_record,
+      isEnableVoiceMail,
+      isForwardCall,
+      callForwardPhoneNumber,
+    };
   };
 }

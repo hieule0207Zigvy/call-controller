@@ -17,4 +17,5 @@ export const isPhoneNumberOrSIP = (input: string) => {
   } else if (sipAddressPattern.test(input)) {
     return "sip";
   }
+  else return false
 };

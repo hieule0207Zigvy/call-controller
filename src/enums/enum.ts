@@ -22,3 +22,16 @@ export enum ConferenceType {
   JOIN = "join",
   END = "end",
 }
+
+export enum GroupCallSettingRingingType {
+  MEMBER_AUTO_ASSIGN = "MEMBER_AUTO_ASSIGN",
+  OWNER = "OWNER",
+  MEMBER = "MEMBER",
+  GROUP = "GROUP",
+  OTHER_GROUP = "OTHER_GROUP",
+  EXTERNAL_NUMBER = "EXTERNAL_NUMBER",
+  IVR = "IVR",
+  HANG_UP = "HANG_UP",
+  A_ROLE_IN_GROUP = "A_ROLE_IN_GROUP",
+  CALL_FORWARDING = "CALL_FORWARDING",
+}

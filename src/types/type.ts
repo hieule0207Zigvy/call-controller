@@ -27,11 +27,15 @@ export interface IConfCall {
   status: ConfCallStatus;
   members: ILegMember[];
   currentMemberInConf: number;
-  fallOverTimeOut: string;
+  fallOverTimeOutSid: string;
   isOutboundCall: boolean;
   listPhoneFirstInviteRinging: string[];
   conversationId?: string;
   eventTime?: string;
+  isEnableFallOver?: boolean;
+  fallOverMediaUrl?: string;
+  fallOverTimeout?: number;
+  timeoutMediaUrl?: string;
 }
 
 export interface ITypeOfToUser {
