@@ -72,7 +72,7 @@ export class CallControllerService {
     let welcomeMedia = "";
     let queueMedia = "";
     let timeoutMedia = "";
-    let queueTimeout = "";
+    let queueTimeout = 100;
     let voicemailTimeout = 60;
     let voicemailMedia = "";
     let fromNumber: string;
@@ -80,6 +80,7 @@ export class CallControllerService {
     let isEnableVoiceMail = false;
     let isForwardCall = false;
     let callForwardPhoneNumber = "";
+    let isExternalForwardCall = false;
 
     const {
       type,
@@ -107,16 +108,16 @@ export class CallControllerService {
         break;
       }
       case GroupCallSettingRingingType.CALL_FORWARDING: {
-        isForwardCall: true;
-        fromNumber: external_number.ani;
+        fromNumber = external_number.ani;
         callForwardPhoneNumber = call_setting_forward_phone;
         if (call_setting_welcome_media) {
           welcomeMedia = call_setting_welcome_media;
         }
-
+        isForwardCall = true;
         break;
       }
       case GroupCallSettingRingingType.EXTERNAL_NUMBER: {
+        isExternalForwardCall = true;
         memberNeedToCall.push({
           type: MemberType.EXTERNAL_PHONE,
           number: external_number.phone_number,
@@ -234,6 +235,42 @@ export class CallControllerService {
       isEnableVoiceMail,
       isForwardCall,
       callForwardPhoneNumber,
+      isExternalForwardCall,
     };
+  };
+
+  enableQueueMedia = async (conferenceLog: IConfCall, masterCallId: string) => {
+    console.log("🚀 ~ file: call-controller.service.ts:241 ~ CallControllerService ~ enableQueueMedia= ~ conferenceLog:", conferenceLog);
+    await axios
+      .put(
+        `${process.env.JAMBONZ_REST_API_BASE_URL}/Accounts/${process.env.JAMBONZ_ACCOUNT_SID}/Calls/${masterCallId}`,
+        { call_hook: `${process.env.BACKEND_URL}/call-controller/queue-hook/${conferenceLog.confUniqueName}` },
+        {
+          headers: {
+            Authorization: `Bearer ${process.env.JAMBONZ_API_KEY}`,
+          },
+        },
+      )
+      .catch(err => {
+        console.log("🚀 ~ file: call-controller.service.ts:254 ~ CallControllerService ~ enableQueueMedia= ~ err:", err);
+        return;
+      });
+  };
+
+  removeQueueMedia = async (masterCallId: string, conferenceName) => {
+    await axios
+      .put(
+        `${process.env.JAMBONZ_REST_API_BASE_URL}/Accounts/${process.env.JAMBONZ_ACCOUNT_SID}/Calls/${masterCallId}`,
+        { call_hook: `${process.env.BACKEND_URL}/call-controller/rejoin-hook/${conferenceName}` },
+        {
+          headers: {
+            Authorization: `Bearer ${process.env.JAMBONZ_API_KEY}`,
+          },
+        },
+      )
+      .catch(err => {
+        console.log("🚀 ~ file: call-controller.service.ts:272 ~ CallControllerService ~ removeQueueMedia= ~ err:", err);
+        return;
+      });
   };
 }

@@ -36,6 +36,9 @@ export interface IConfCall {
   fallOverMediaUrl?: string;
   fallOverTimeout?: number;
   timeoutMediaUrl?: string;
+  queueMediaUrl?: string;
+  queueTimeout?: number;
+  isTriggerQueueMedia?: boolean;
 }
 
 export interface ITypeOfToUser {

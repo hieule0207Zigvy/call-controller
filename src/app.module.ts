@@ -3,6 +3,7 @@ import { AppController } from "./app.controller";
 import { AppService } from "./app.service";
 import { CallControllerModule } from "./call-controller/call-controller.module";
 import { CacheModule } from "@nestjs/cache-manager";
+import { JambonzModule } from './jambonz/jambonz.module';
 import * as redisStore from "cache-manager-redis-store";
 
 @Module({
@@ -14,6 +15,7 @@ import * as redisStore from "cache-manager-redis-store";
       port: process.env.REDIS_PORT,
     }),
     CallControllerModule,
+    JambonzModule,
   ],
   controllers: [AppController],
   providers: [AppService],

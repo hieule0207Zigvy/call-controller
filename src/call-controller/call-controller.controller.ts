@@ -79,19 +79,14 @@ export class CallControllerController {
         }
 
         if (isForwardCall) {
-          if (!!welcomeMedia) {
-            app.play({ url: welcomeMedia });
-          }
-          app.dial({
-            answerOnBridge: true,
-            callerId: fromNumber,
-            target: [
-              {
-                type: "phone",
-                number: callForwardPhoneNumber,
+          app
+            .tag({
+              data: {
+                to,
+                callForwardPhoneNumber,
               },
-            ],
-          });
+            })
+            .play({ url: welcomeMedia, actionHook: "/call-controller/forwarding-hook" });
           return res.status(200).json(app);
         }
 
@@ -106,14 +101,6 @@ export class CallControllerController {
           // });
           // end record
         }
-        app.tag({
-          data: {
-            listMember: memberNeedToCall,
-            uniqNameConference,
-            from: fromNumber ? fromNumber : from,
-          },
-        });
-        // if (!welcomeMedia) {
         app
           .tag({
             data: {
@@ -129,48 +116,8 @@ export class CallControllerController {
             statusHook: "/call-controller/conference-status",
             startConferenceOnEnter: true,
             endConferenceOnExit: true,
-          })
-          .play({ url: welcomeMedia, actionHook: "/call-controller/timeout-media-hook", timeoutSecs: queueTimeout });
-        // }
-        // else {
-        //   const welcomeOption = {
-        //     url: welcomeMedia,
-        //     actionHook: "/call-controller/call-hook",
-        //   };
-        //   const queueOption = {
-        //     url: queueMedia,
-        //     timeoutSecs: queueTimeout,
-        //     actionHook: "/call-controller/timeout-media-hook",
-        //   };
-        //   if (queueMedia) {
-        //       app.play(welcomeOption)
-        //       .conference({
-        //         name: uniqNameConference,
-        //         statusEvents: [ConferenceType.END, ConferenceType.JOIN, ConferenceType.START, ConferenceType.LEAVE],
-        //         statusHook: "/call-controller/conference-status",
-        //         startConferenceOnEnter: true,
-        //         endConferenceOnExit: true,
-        //       })
-        //       // .play(queueOption);
-        //   } else {
-        //     app
-        //       .tag({
-        //         data: {
-        //           listMember: memberNeedToCall,
-        //           uniqNameConference,
-        //           from: fromNumber ? fromNumber : from,
-        //         },
-        //       })
-        //       .play(welcomeOption)
-        //       .conference({
-        //         name: uniqNameConference,
-        //         statusEvents: [ConferenceType.END, ConferenceType.JOIN, ConferenceType.START, ConferenceType.LEAVE],
-        //         statusHook: "/call-controller/conference-status",
-        //         startConferenceOnEnter: true,
-        //         endConferenceOnExit: true,
-        //       });
-        //   }
-        // }
+          });
+        // .play({ url: welcomeMedia, actionHook: "/call-controller/timeout-media-hook", timeoutSecs: queueTimeout });
         // conference created
         res.status(200).json(app);
         const initCallLog: IConfCall = {
@@ -185,10 +132,13 @@ export class CallControllerController {
           listPhoneFirstInviteRinging: [],
           eventTime: "",
           conversationId,
-          isEnableFallOver: isEnableVoiceMail,
+          isEnableFallOver: true,
           fallOverMediaUrl: voicemailMedia,
           fallOverTimeout: voicemailTimeout * 1000,
           timeoutMediaUrl: timeoutMedia,
+          queueMediaUrl: queueMedia,
+          queueTimeout: 10,
+          isTriggerQueueMedia: false,
         };
         await this.callControllerService.setCallLogToRedis(uniqNameConference, initCallLog, null);
       } else res.status(200);
@@ -202,55 +152,55 @@ export class CallControllerController {
   async agentCreateConference(@Req() req: Request, @Res() res: Response): Promise<any> {
     try {
       // Call Api to chatchilla to get did of sip account is calling.
-      const { from, sip } = req.body;
-      const { headers } = sip || {};
-      let toUser: IToUserType = {};
-      let fromDid = "";
-      console.log("🚀 ~ file: call-controller.controller.ts:113 ~ CallControllerController ~ agentCreateConference ~  req.body:", req.body);
-      if (!headers) return res.status(400);
-      const { ani = "", to } = headers;
-      fromDid = `${from}@${process.env.CHATCHILLA_SIP_DOMAIN}`;
-      if (!!ani) fromDid = ani;
-      const isMatchPhoneFormat = to.match(/<sip:(\d+)@/) || to.match(/<sip:(\+\d+)@/);
-      if (isMatchPhoneFormat && isMatchPhoneFormat.length > 1) {
-        const extractedNumber = isMatchPhoneFormat[1]; // Output: +17147520454
-        toUser.type = MemberType.EXTERNAL_PHONE;
-        toUser.number = extractedNumber.includes("+") ? extractedNumber : `+${extractedNumber}`;
-      } else {
-        const isMatchSipFormat = to.match(/<sip:(.*?)@/);
-        if (isMatchSipFormat && isMatchSipFormat.length > 1) {
-          const extractedText = isMatchSipFormat[1];
-          toUser.type = MemberType.USER;
-          toUser.name = `${extractedText}@${process.env.CHATCHILLA_SIP_DOMAIN}`;
-        } else {
-          return res.status(400);
-        }
-      }
-      // for mocking purposes
-      // const { from, to } = req.body;
+      // const { from, sip } = req.body;
+      // const { headers } = sip || {};
       // let toUser: IToUserType = {};
       // let fromDid = "";
-      // if (from === "test8") fromDid = "16164413854";
-      // if (from === "test8sub") fromDid = "16164399715";
-      // if (isPhoneNumberOrSIP(to) === MemberType.SIP_USER) {
-      //   toUser.type = to.includes(process.env.CHATCHILLA_SIP_DOMAIN) ? MemberType.USER : MemberType.SIP_USER;
-      //   toUser.name = to;
+      // console.log("🚀 ~ file: call-controller.controller.ts:113 ~ CallControllerController ~ agentCreateConference ~  req.body:", req.body);
+      // if (!headers) return res.status(400);
+      // const { ani = "", to } = headers;
+      // fromDid = `${from}@${process.env.CHATCHILLA_SIP_DOMAIN}`;
+      // if (!!ani) fromDid = ani;
+      // const isMatchPhoneFormat = to.match(/<sip:(\d+)@/) || to.match(/<sip:(\+\d+)@/);
+      // if (isMatchPhoneFormat && isMatchPhoneFormat.length > 1) {
+      //   const extractedNumber = isMatchPhoneFormat[1]; // Output: +17147520454
+      //   toUser.type = MemberType.EXTERNAL_PHONE;
+      //   toUser.number = extractedNumber.includes("+") ? extractedNumber : `+${extractedNumber}`;
       // } else {
-      //   if (to === "16164413854") {
+      //   const isMatchSipFormat = to.match(/<sip:(.*?)@/);
+      //   if (isMatchSipFormat && isMatchSipFormat.length > 1) {
+      //     const extractedText = isMatchSipFormat[1];
       //     toUser.type = MemberType.USER;
-      //     toUser.name = "test8@voice.chatchilladev.sip.jambonz.cloud";
-      //   } else if (to === "16164399715") {
-      //     toUser.type = MemberType.USER;
-      //     toUser.name = "test8sub@voice.chatchilladev.sip.jambonz.cloud";
+      //     toUser.name = `${extractedText}@${process.env.CHATCHILLA_SIP_DOMAIN}`;
       //   } else {
-      //     toUser.type = MemberType.EXTERNAL_PHONE;
-      //     toUser.number = to.length <= 10 ? `1${to}` : to;
+      //     return res.status(400);
       //   }
       // }
-      // if (to === "test8" || to === "test8sub") {
-      //   toUser.type = MemberType.USER;
-      //   toUser.name = `${to}@voice.chatchilladev.sip.jambonz.cloud`;
-      // }
+      // for mocking purposes
+      const { from, to } = req.body;
+      let toUser: IToUserType = {};
+      let fromDid = "";
+      if (from === "test8") fromDid = "16164413854";
+      if (from === "test8sub") fromDid = "16164399715";
+      if (isPhoneNumberOrSIP(to) === MemberType.SIP_USER) {
+        toUser.type = to.includes(process.env.CHATCHILLA_SIP_DOMAIN) ? MemberType.USER : MemberType.SIP_USER;
+        toUser.name = to;
+      } else {
+        if (to === "16164413854") {
+          toUser.type = MemberType.USER;
+          toUser.name = "test8@voice.chatchilladev.sip.jambonz.cloud";
+        } else if (to === "16164399715") {
+          toUser.type = MemberType.USER;
+          toUser.name = "test8sub@voice.chatchilladev.sip.jambonz.cloud";
+        } else {
+          toUser.type = MemberType.EXTERNAL_PHONE;
+          toUser.number = to.length <= 10 ? `1${to}` : to;
+        }
+      }
+      if (to === "test8" || to === "test8sub") {
+        toUser.type = MemberType.USER;
+        toUser.name = `${to}@voice.chatchilladev.sip.jambonz.cloud`;
+      }
       const app = new WebhookResponse();
       const uniqNameConference = getUniqConferenceName();
       console.log("🚀 ~ file: call-controller.controller.ts:151 ~ CallControllerController ~ agentJoinOrCreateConference ~ uniqNameConference:", uniqNameConference);
@@ -464,14 +414,51 @@ export class CallControllerController {
     const { uniqNameConference } = customerData;
     const app = new WebhookResponse();
     const currentCallLog: IConfCall = await this.callControllerService.getCallLogOfCall(uniqNameConference);
-    if (!currentCallLog?.isOneOfMemberAnswer) {
-      const option = {
-        url: "",
-      };
-      if (!!currentCallLog?.timeoutMediaUrl) option.url = currentCallLog.timeoutMediaUrl;
-      app.play(option);
-      res.status(200).json(app);
-    } else return res.status(200);
+    if (!!currentCallLog.timeoutMediaUrl) {
+      app.play({ url: currentCallLog.timeoutMediaUrl });
+    }
+    if (!!currentCallLog.fallOverMediaUrl && !!currentCallLog.isEnableFallOver) {
+      app.play({ url: currentCallLog.fallOverMediaUrl });
+    }
+    res.status(200).json(app);
+  }
+
+  @Post("queue-hook/:conferenceName")
+  async queueHook(@Req() req: Request, @Res() res: Response): Promise<any> {
+    const { conferenceName } = req.params;
+    const app = new WebhookResponse();
+    const currentCallLog: IConfCall = await this.callControllerService.getCallLogOfCall(conferenceName);
+    const option = {
+      url: currentCallLog.queueMediaUrl,
+      timeoutSecs: currentCallLog.queueTimeout,
+      actionHook: "",
+    };
+    const newData = { isTriggerQueueMedia: true };
+    await this.callControllerService.setCallLogToRedis(conferenceName, newData, currentCallLog);
+    if (!!currentCallLog.timeoutMediaUrl) option.actionHook = "/call-controller/timeout-media-hook";
+    app.play(option).conference({
+      name: conferenceName,
+      statusEvents: [ConferenceType.END, ConferenceType.JOIN, ConferenceType.START, ConferenceType.LEAVE],
+      statusHook: "/call-controller/conference-status",
+      startConferenceOnEnter: true,
+      endConferenceOnExit: true,
+    });
+    res.status(200).json(app);
+  }
+
+  @Post("rejoin-hook/:conferenceName")
+  async reJoinConferenceHook(@Req() req: Request, @Res() res: Response): Promise<any> {
+    const { conferenceName } = req.params;
+    const app = new WebhookResponse();
+    // if (!!currentCallLog.timeoutMediaUrl) option.actionHook = "/call-controller/timeout-media-hook";
+    app.conference({
+      name: conferenceName,
+      statusEvents: [ConferenceType.END, ConferenceType.JOIN, ConferenceType.START, ConferenceType.LEAVE],
+      statusHook: "/call-controller/conference-status",
+      startConferenceOnEnter: true,
+      endConferenceOnExit: true,
+    });
+    res.status(200).json(app);
   }
 
   @Post("conference-wait-hook/:conferenceName")
@@ -500,7 +487,7 @@ export class CallControllerController {
   }
 
   @Post("call-hook")
-  callHook(@Req() req: Request, @Res() res: Response): any {
+  async callHook(@Req() req: Request, @Res() res: Response): Promise<any> {
     const { body } = req;
     const { customerData = {} } = body;
     const { listMember = [], uniqNameConference, from } = customerData;
@@ -549,6 +536,27 @@ export class CallControllerController {
     res.sendStatus(200);
   }
 
+  @Post("forwarding-hook")
+  async forwardingHook(@Req() req: Request, @Res() res: Response): Promise<any> {
+    const { body } = req;
+    const { customerData = {} } = body;
+    const { to, callForwardPhoneNumber } = customerData;
+    // const { outDialNumber = "17147520454", callerId = "+16164413854" } = req.body;
+    console.log("🚀 ~ file: call-controller.controller.ts:553 ~ forwardingHook ~ customerData:", customerData);
+    const app = new WebhookResponse();
+    app.dial({
+      callerId: to,
+      answerOnBridge: true,
+      target: [
+        {
+          type: "phone",
+          number: callForwardPhoneNumber.replace(/[+\s]/g, ""),
+        },
+      ],
+    });
+    res.status(200).json(app);
+  }
+
   // status logger
   @Post("call-status")
   callStatus(@Req() req: Request, @Res() res: Response): any {
@@ -576,25 +584,33 @@ export class CallControllerController {
       });
       const newData = { members: newMembers, currentMemberInConf: members };
       await this.callControllerService.setCallLogToRedis(friendly_name, newData, currentCallLog);
-      if (event === ConferenceType.START && currentCallLog?.isEnableFallOver) {
-        const timeoutFallOverFunc = setTimeout(async () => {
-          const test = await axios
-            .put(
-              `${process.env.JAMBONZ_REST_API_BASE_URL}/Accounts/${process.env.JAMBONZ_ACCOUNT_SID}/Calls/${call_sid}`,
-              { call_hook: `${process.env.BACKEND_URL}/call-controller/conference-wait-hook/${friendly_name}` },
-              {
-                headers: {
-                  Authorization: `Bearer ${process.env.JAMBONZ_API_KEY}`,
+      if (event === ConferenceType.START) {
+        const newData = { status: ConfCallStatus.START, masterCallId: call_sid, fallOverTimeOutSid: "", eventTime: time };
+        // if (currentCallLog?.isEnableFallOver && !currentCallLog.queueMediaUrl && !currentCallLog?.queueTimeout) {
+        if (currentCallLog?.isEnableFallOver) {
+          const timeoutFallOverFunc = setTimeout(async () => {
+            const test = await axios
+              .put(
+                `${process.env.JAMBONZ_REST_API_BASE_URL}/Accounts/${process.env.JAMBONZ_ACCOUNT_SID}/Calls/${call_sid}`,
+                { call_hook: `${process.env.BACKEND_URL}/call-controller/conference-wait-hook/${friendly_name}` },
+                {
+                  headers: {
+                    Authorization: `Bearer ${process.env.JAMBONZ_API_KEY}`,
+                  },
                 },
-              },
-            )
-            .catch(err => console.log("🚀 ~ file: call-controller.service.ts:33 ~ CallControllerService ~ callSids.map ~ err:", err));
-        }, currentCallLog?.fallOverTimeout);
-        this.callControllerService.pushTimeOut(timeoutFallOverFunc, call_sid);
-        const newData = { status: ConfCallStatus.START, masterCallId: call_sid, fallOverTimeOutSid: call_sid, eventTime: time };
+              )
+              .catch(err => console.log("🚀 ~ file: call-controller.service.ts:33 ~ CallControllerService ~ callSids.map ~ err:", err));
+          }, currentCallLog?.fallOverTimeout);
+          this.callControllerService.pushTimeOut(timeoutFallOverFunc, call_sid);
+          newData.fallOverTimeOutSid = call_sid;
+        }
+        // if (!!currentCallLog?.queueMediaUrl && !!currentCallLog?.queueTimeout && !currentCallLog?.isTriggerQueueMedia) {
+        //   await this.callControllerService.enableQueueMedia(currentCallLog, call_sid);
+        // }
         await this.callControllerService.setCallLogToRedis(friendly_name, newData, currentCallLog);
       }
       if (event === ConferenceType.JOIN && call_sid !== currentCallLog.masterCallId) {
+        this.callControllerService.removeQueueMedia(currentCallLog.masterCallId, friendly_name);
         const currentMembers = currentCallLog.members;
         const currentMemberCallSids = currentMembers.map((m: ILegMember) => m.callId);
 
@@ -642,8 +658,10 @@ export class CallControllerController {
           member.status = LegMemberStatus.leave;
           member.eventTime = time;
         });
+        // if ((!currentCallLog?.queueMediaUrl && !currentCallLog.queueTimeout) || !!currentCallLog?.isTriggerQueueMedia) {
         const newData = { status: ConfCallStatus.END, members: currentMembers, fallOverTimeOutSid: null, currentMemberInConf: members, eventTime: time };
         await this.callControllerService.setCallLogToRedis(friendly_name, newData, currentCallLog);
+        // }
       }
       res.sendStatus(200);
     } catch (error) {

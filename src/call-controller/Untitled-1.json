@@ -25,3 +25,38 @@
   },
   "msg": "received metadata"
 }
+
+{
+  "name": "Twilio-5dgSS7nKGyHLPEYmgFwmFX",
+  "e164_leading_plus": 1,
+  "application_sid": "cf8dd01c-9918-4938-bc74-e31a274ea136",
+  "service_provider_sid": "6072f617-6151-4c15-8eb9-74a4967ab701",
+  "account_sid": "fbbbcf97-139e-4b99-81c5-58f482a42bf2",
+  "requires_register": false,
+  "register_username": "test8",
+  "register_password": "yZwMnZ3ATSFAVw.MRS5",
+  "register_sip_realm": null,
+  "register_from_user": null,
+  "register_from_domain": null,
+  "register_public_ip_in_contact": false,
+  "tech_prefix": null,
+  "diversion": null,
+  "is_active": 1,
+  "smpp_system_id": null,
+  "smpp_password": null,
+  "smpp_inbound_system_id": null,
+  "smpp_inbound_password": null
+} //method post https://jambonz.cloud/api/v1/Accounts/fbbbcf97-139e-4b99-81c5-58f482a42bf2/VoipCarriers/d0366230-bb4d-47d3-8fef-311b143f3ece
+
+{
+  "ipv4": "pbx-cce67b2d-2361-4b17-955e-72249c0a1f3a.pstn.twilio.com",
+  "netmask": 32,
+  "port": 5060,
+  "inbound": 0,
+  "outbound": 1,
+  "voip_carrier_sid": "d0366230-bb4d-47d3-8fef-311b143f3ece",
+  "is_active": 1,
+  "protocol": "udp",
+  "pad_crypto": 0
+} // method put url https://jambonz.cloud/api/v1/SipGateways/f7991d10-eb16-4a1f-a446-91d1401d599a
+
