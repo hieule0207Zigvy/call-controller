@@ -16,6 +16,16 @@ export const isPhoneNumberOrSIP = (input: string) => {
     return "phone";
   } else if (sipAddressPattern.test(input)) {
     return "sip";
+  } else return false;
+};
+
+export const getNameOfEmail = (email: string) => {
+  const regex = /^([^@]+)@/;
+  var match = email.match(regex);
+
+  if (match) {
+    return match[1];
+  } else {
+    return false;
   }
-  else return false
 };

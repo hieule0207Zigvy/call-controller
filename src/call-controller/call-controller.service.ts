@@ -1,5 +1,5 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { GroupCallSettingRingingType, LegMemberStatus, MemberType } from "src/enums/enum";
+import { ConfCallStatus, GroupCallSettingRingingType, LegMemberStatus, MemberType } from "src/enums/enum";
 import { IConfCall, ILegMember } from "src/types/type";
 const jambonz = require("@jambonz/node-client");
 import axios from "axios";
@@ -7,6 +7,7 @@ import { CACHE_MANAGER } from "@nestjs/cache-manager";
 var _ = require("lodash");
 import { Cache } from "cache-manager";
 import { Timer } from "./../utils/Timer";
+import { getNameOfEmail, isPhoneNumberOrSIP } from "src/utils/until";
 
 @Injectable()
 export class CallControllerService {
@@ -36,8 +37,7 @@ export class CallControllerService {
       );
       return true;
     } catch (error) {
-      console.log("🚀 ~ file: call-controller.service.ts:30 ~ CallControllerService ~ endAllRingingCall ~ error:", error);
-      return true;
+      console.log("🚀 ~ file: call-controller.service.ts:40 ~ CallControllerService ~ endAllRingingCall ~ error:", error);
     }
   }
 
@@ -80,7 +80,6 @@ export class CallControllerService {
     let isEnableVoiceMail = false;
     let isForwardCall = false;
     let callForwardPhoneNumber = "";
-    let isExternalForwardCall = false;
 
     const {
       type,
@@ -95,12 +94,15 @@ export class CallControllerService {
       owner,
       call_setting_auto_record,
     } = callSettingData;
+    console.log("🚀 ~ file: call-controller.service.ts:98 ~ CallControllerService ~ type:", type);
 
     const { members = [] } = group;
     const memberInOtherGroup = other_group?.members;
 
     switch (type) {
       case GroupCallSettingRingingType.HANG_UP: {
+        //pass
+
         isHangup = true;
         if (call_setting_welcome_media) {
           welcomeMedia = call_setting_welcome_media;
@@ -108,6 +110,8 @@ export class CallControllerService {
         break;
       }
       case GroupCallSettingRingingType.CALL_FORWARDING: {
+        //pass
+
         fromNumber = external_number.ani;
         callForwardPhoneNumber = call_setting_forward_phone;
         if (call_setting_welcome_media) {
@@ -117,21 +121,31 @@ export class CallControllerService {
         break;
       }
       case GroupCallSettingRingingType.EXTERNAL_NUMBER: {
-        isExternalForwardCall = true;
+        // pass
+
+        const external_number = {
+          phone_number: "+17147520454",
+          ani: "+16164413854",
+          gateway: ["twillio-gw", "Ytel", "Questblue"],
+        };
         memberNeedToCall.push({
           type: MemberType.EXTERNAL_PHONE,
-          number: external_number.phone_number,
-          fromNumber: external_number.ani,
+          number: external_number.phone_number.replace(/[\s+]/g, ""),
         });
+        fromNumber = external_number.ani.replace(/[\s+]/g, "");
         if (call_setting_welcome_media) {
           welcomeMedia = call_setting_welcome_media;
         }
         break;
       }
       case GroupCallSettingRingingType.MEMBER: {
+        // pass
+
         members.forEach(member => {
           if (call_setting_member_id.includes(member.id)) {
-            memberNeedToCall.push({ type: MemberType.USER, name: `${member?.trunk_sip_credential.username}${process.env.CHATCHILLA_SIP_DOMAIN}` });
+            const { email } = member;
+            const sipName = getNameOfEmail(email);
+            if (!!sipName) memberNeedToCall.push({ type: MemberType.USER, name: `${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}` });
           }
         });
         if (call_setting_welcome_media) {
@@ -146,9 +160,13 @@ export class CallControllerService {
         break;
       }
       case GroupCallSettingRingingType.A_ROLE_IN_GROUP: {
+        // pass
         members.forEach(member => {
-          if (member.roles(call_setting_role)) {
-            memberNeedToCall.push({ type: MemberType.USER, name: `${member?.trunk_sip_credential.username}${process.env.CHATCHILLA_SIP_DOMAIN}` });
+          const { roles } = member;
+          if (roles.includes(call_setting_role)) {
+            const { email } = member;
+            const sipName = getNameOfEmail(email);
+            if (!!sipName) memberNeedToCall.push({ type: MemberType.USER, name: `${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}` });
           }
         });
         if (call_setting_welcome_media) {
@@ -157,10 +175,12 @@ export class CallControllerService {
         break;
       }
       case GroupCallSettingRingingType.GROUP: {
-        // members.forEach(member => {
-        //   memberNeedToCall.push({ type: MemberType.USER, name: `${member?.trunk_sip_credential.username}${process.env.CHATCHILLA_SIP_DOMAIN}` });
-        // }); // need migra with chatchilla so mocking sip account
-        memberNeedToCall.push({ type: MemberType.USER, name: `test8sub@${process.env.CHATCHILLA_SIP_DOMAIN}` });
+        // pass
+        members.forEach(member => {
+          const { email } = member;
+          const sipName = getNameOfEmail(email);
+          if (!!sipName) memberNeedToCall.push({ type: MemberType.USER, name: `${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}` });
+        });
         if (call_setting_welcome_media) {
           welcomeMedia = call_setting_welcome_media;
           queueMedia = queue_settings.queue_media;
@@ -173,9 +193,13 @@ export class CallControllerService {
         break;
       }
       case GroupCallSettingRingingType.OTHER_GROUP: {
+        // pass
         memberInOtherGroup.forEach(member => {
-          memberNeedToCall.push({ type: MemberType.USER, name: `${member?.trunk_sip_credential.username}${process.env.CHATCHILLA_SIP_DOMAIN}` });
+          const { email } = member;
+          const sipName = getNameOfEmail(email);
+          if (!!sipName) memberNeedToCall.push({ type: MemberType.USER, name: `${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}` });
         });
+
         if (call_setting_welcome_media) {
           welcomeMedia = call_setting_welcome_media;
           isEnableVoiceMail = queue_settings.isVoiceMail;
@@ -184,7 +208,11 @@ export class CallControllerService {
       }
       case GroupCallSettingRingingType.MEMBER_AUTO_ASSIGN: {
         members.forEach(member => {
-          if (member.auto_assign) memberNeedToCall.push({ type: MemberType.USER, name: `${member?.trunk_sip_credential.username}${process.env.CHATCHILLA_SIP_DOMAIN}` });
+          if (member.auto_assign) {
+            const { email } = member;
+            const sipName = getNameOfEmail(email);
+            if (!!sipName) memberNeedToCall.push({ type: MemberType.USER, name: `${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}` });
+          }
         });
         if (call_setting_welcome_media) {
           welcomeMedia = call_setting_welcome_media;
@@ -195,16 +223,18 @@ export class CallControllerService {
           voicemailMedia = queue_settings.voicemail_media;
           isEnableVoiceMail = queue_settings.isVoiceMail;
         }
-        if (memberNeedToCall.length === 0)
-          // queue call
-          break;
+        break;
       }
       case GroupCallSettingRingingType.OWNER: {
         if (owner) {
-          memberNeedToCall.push({ type: MemberType.USER, name: `${owner?.trunk_sip_credential.username}${process.env.CHATCHILLA_SIP_DOMAIN}` });
+          const { email } = owner;
+          const sipName = getNameOfEmail(email);
+          if (!!sipName) memberNeedToCall.push({ type: MemberType.USER, name: `${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}` });
         } else {
           members.forEach(member => {
-            memberNeedToCall.push({ type: MemberType.USER, name: `${owner?.trunk_sip_credential.username}${process.env.CHATCHILLA_SIP_DOMAIN}` });
+            const { email } = member;
+            const sipName = getNameOfEmail(email);
+            if (!!sipName) memberNeedToCall.push({ type: MemberType.USER, name: `${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}` });
           });
         }
         if (call_setting_welcome_media) {
@@ -216,6 +246,7 @@ export class CallControllerService {
           voicemailMedia = queue_settings.voicemail_media;
           isEnableVoiceMail = queue_settings.isVoiceMail;
         }
+        break;
       }
       default:
         break;
@@ -235,7 +266,6 @@ export class CallControllerService {
       isEnableVoiceMail,
       isForwardCall,
       callForwardPhoneNumber,
-      isExternalForwardCall,
     };
   };
 
@@ -272,5 +302,97 @@ export class CallControllerService {
         console.log("🚀 ~ file: call-controller.service.ts:272 ~ CallControllerService ~ removeQueueMedia= ~ err:", err);
         return;
       });
+  };
+
+  updateListMemberOfConference = async (currentCallLog: IConfCall, jambonzLog: any) => {
+    const { call_sid, event, friendly_name, time, members } = jambonzLog;
+    const newMembers = currentCallLog.members || [];
+    newMembers.forEach((m: ILegMember) => {
+      if (call_sid === m.callId) {
+        m.status = LegMemberStatus[event];
+        m.eventTime = time;
+      }
+    });
+    const newData = { members: newMembers, currentMemberInConf: members };
+    await this.setCallLogToRedis(friendly_name, newData, currentCallLog);
+  };
+
+  triggerFallOverTimeoutWithoutQueueMedia = async (currentCallLog: IConfCall, jambonzLog: any) => {
+    try {
+      const { call_sid, friendly_name, time } = jambonzLog;
+      const newData = { status: ConfCallStatus.START, masterCallId: call_sid, fallOverTimeOutSid: "", eventTime: time };
+      const timeoutFallOverFunc = setTimeout(async () => {
+        const test = await axios.put(
+          `${process.env.JAMBONZ_REST_API_BASE_URL}/Accounts/${process.env.JAMBONZ_ACCOUNT_SID}/Calls/${call_sid}`,
+          { call_hook: `${process.env.BACKEND_URL}/call-controller/conference-wait-hook/${friendly_name}` },
+          {
+            headers: {
+              Authorization: `Bearer ${process.env.JAMBONZ_API_KEY}`,
+            },
+          },
+        );
+      }, currentCallLog?.fallOverTimeout);
+      this.pushTimeOut(timeoutFallOverFunc, call_sid);
+      newData.fallOverTimeOutSid = call_sid;
+      await this.setCallLogToRedis(friendly_name, newData, currentCallLog);
+    } catch (error) {
+      console.log("🚀 ~ file: call-controller.service.ts:342 ~ CallControllerService ~ triggerFallOverTimeoutWithoutQueueMedia= ~ error:", error);
+    }
+  };
+
+  reMappingMemberList = async (currentCallLog: IConfCall, jambonzLog: any) => {
+    const { call_sid, to, time, members, friendly_name } = jambonzLog;
+    const currentMembers = currentCallLog.members;
+    const currentMemberCallSids = currentMembers.map((m: ILegMember) => m.callId);
+    if (!currentMemberCallSids.includes(call_sid)) {
+      currentMembers.push({
+        callId: call_sid,
+        type: isPhoneNumberOrSIP(to) === MemberType.SIP_USER ? MemberType.USER : MemberType.EXTERNAL_PHONE,
+        status: LegMemberStatus.join,
+        value: to,
+        eventTime: time,
+      });
+      const newData = { members: currentMembers, currentMemberInConf: members };
+      await this.setCallLogToRedis(friendly_name, newData, currentCallLog);
+    }
+  };
+
+  endCallOfFirstInviteMemberAndUpdateListMember = async (currentCallLog: IConfCall, jambonzLog: any) => {
+    try {
+      const { members, friendly_name, call_sid, time } = jambonzLog;
+      const listPhoneFirstInviteRinging = currentCallLog?.listPhoneFirstInviteRinging || [];
+      if (!currentCallLog.isOutboundCall) {
+        const filterAcceptCallSid = listPhoneFirstInviteRinging.filter((ringingCall: string) => ringingCall !== call_sid);
+        await this.endAllRingingCall(filterAcceptCallSid);
+        const currentMembers = currentCallLog.members;
+        currentMembers.forEach((member: ILegMember) => {
+          if (filterAcceptCallSid.includes(member.callId)) {
+            member.status = LegMemberStatus.leave;
+            member.eventTime = time;
+          }
+        });
+        const newData = { fallOverTimeOutSid: null, currentMemberInConf: members, members: currentMembers };
+        await this.setCallLogToRedis(friendly_name, newData, currentCallLog);
+      } else {
+        const newData = { fallOverTimeOutSid: null, currentMemberInConf: members };
+        await this.setCallLogToRedis(friendly_name, newData, currentCallLog);
+      }
+    } catch (error) {
+      console.log("🚀 ~ file: call-controller.service.ts:381 ~ CallControllerService ~ endCallOfFirstInviteMemberAndUpdateListMember= ~ error:", error);
+    }
+  };
+
+  updateMemberAndStateOfEndedConference = async (currentCallLog: IConfCall, jambonzLog: any) => {
+    const { conference_sid, event, members, friendly_name, call_sid, to, time } = jambonzLog;
+    const filterRingingCallSid = currentCallLog.members.filter((member: ILegMember) => member.status == LegMemberStatus.calling).map((member: ILegMember) => member.callId);
+    await this.endAllRingingCall(filterRingingCallSid);
+    const currentMembers = currentCallLog.members;
+    currentMembers.forEach((member: ILegMember) => {
+      member.status = LegMemberStatus.leave;
+      member.eventTime = time;
+    });
+    // if ((!currentCallLog?.queueMediaUrl && !currentCallLog.queueTimeout) || !!currentCallLog?.isTriggerQueueMedia) {
+    const newData = { status: ConfCallStatus.END, members: currentMembers, fallOverTimeOutSid: null, currentMemberInConf: members, eventTime: time };
+    await this.setCallLogToRedis(friendly_name, newData, currentCallLog);
   };
 }
