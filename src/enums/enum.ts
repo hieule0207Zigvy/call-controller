@@ -1,6 +1,9 @@
 export enum ConfCallStatus {
+  CREATED = "CREATED",
   START = "START",
   END = "END",
+  QUEUE = "QUEUE",
+  AUTO_ASSIGN_QUEUE = "AUTO_ASSIGN_QUEUE",
 }
 
 export enum MemberType {
@@ -14,6 +17,8 @@ export enum LegMemberStatus {
   join = "JOIN",
   end = "END",
   leave = "LEAVE",
+  no_answer = "NO_ANSWER",
+  not_available = "NOT_AVAILABLE",
 }
 
 export enum ConferenceType {
@@ -34,4 +39,17 @@ export enum GroupCallSettingRingingType {
   HANG_UP = "HANG_UP",
   A_ROLE_IN_GROUP = "A_ROLE_IN_GROUP",
   CALL_FORWARDING = "CALL_FORWARDING",
+}
+export enum CallingType {
+  INBOUND = "inbound",
+  OUTBOUND = "outbound",
+}
+
+export enum CallStatus {
+  ringing = "ringing",
+  no_answer = "no-answer",
+  not_available = "failed",
+  trying = "trying",
+  early_media = "early-media",
+  in_progress = "in-progress",
 }

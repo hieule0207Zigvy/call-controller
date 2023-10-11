@@ -39,6 +39,7 @@ export interface IConfCall {
   queueMediaUrl?: string;
   queueTimeout?: number;
   isTriggerQueueMedia?: boolean;
+  isWelcomeMedia?: boolean;
 }
 
 export interface ITypeOfToUser {
