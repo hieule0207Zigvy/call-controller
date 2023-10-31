@@ -11,8 +11,7 @@ import { getNameOfEmail, isPhoneNumberOrSIP } from "src/utils/until";
 
 @Injectable()
 export class CallControllerService {
-  constructor(@Inject(CACHE_MANAGER) private cacheManager: Cache) {
-  }
+  constructor(@Inject(CACHE_MANAGER) private cacheManager: Cache) {}
   private client: any = jambonz(process.env.JAMBONZ_ACCOUNT_SID, process.env.JAMBONZ_API_KEY, {
     baseUrl: process.env.JAMBONZ_REST_API_BASE_URL,
   });
@@ -23,15 +22,35 @@ export class CallControllerService {
     try {
       Promise.all(
         callSids.map(async (callSid: string) => {
-          await axios.put(
-            `${process.env.JAMBONZ_REST_API_BASE_URL}/Accounts/${process.env.JAMBONZ_ACCOUNT_SID}/Calls/${callSid}`,
-            { call_status: "no-answer" },
-            {
-              headers: {
-                Authorization: `Bearer ${process.env.JAMBONZ_API_KEY}`,
+          try {
+            const response = await axios.put(
+              `${process.env.JAMBONZ_REST_API_BASE_URL}/Accounts/${process.env.JAMBONZ_ACCOUNT_SID}/Calls/${callSid}`,
+              { call_status: "no-answer" },
+              {
+                headers: {
+                  Authorization: `Bearer ${process.env.JAMBONZ_API_KEY}`,
+                },
               },
-            },
-          );
+            );
+          } catch (err) {
+            if (err?.response?.status === 422) {
+              try {
+                const response = await axios.put(
+                  `${process.env.JAMBONZ_REST_API_BASE_URL}/Accounts/${process.env.JAMBONZ_ACCOUNT_SID}/Calls/${callSid}`,
+                  { call_status: "completed" },
+                  {
+                    headers: {
+                      Authorization: `Bearer ${process.env.JAMBONZ_API_KEY}`,
+                    },
+                  },
+                );
+              } catch (error) {
+                console.log("🚀 ~ file: call-controller.service.ts:48 ~ CallControllerService ~ callSids.map ~ error:", error);
+              }
+            } else {
+              console.log("🚀 ~ file: call-controller.service.ts:36 ~ CallControllerService ~ callSids.map ~ err:", err);
+            }
+          }
         }),
       );
       return true;
@@ -80,6 +99,7 @@ export class CallControllerService {
     let isForwardCall = false;
     let callForwardPhoneNumber = "";
     let welcomeMediaUrl = false;
+    const userId = [];
     try {
       const {
         type,
@@ -144,7 +164,12 @@ export class CallControllerService {
             if (call_setting_member_id.includes(member.id)) {
               const { email } = member;
               const sipName = getNameOfEmail(email);
-              if (!!sipName) memberNeedToCall.push({ type: MemberType.USER, name: `${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}` });
+              if (!!sipName) {
+                memberNeedToCall.push({ type: MemberType.USER, name: `${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}` });
+                const user = {};
+                user[`${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}`] = member.id;
+                userId.push(user);
+              }
             }
           });
           if (call_setting_welcome_media) {
@@ -165,7 +190,12 @@ export class CallControllerService {
             if (roles.includes(call_setting_role)) {
               const { email } = member;
               const sipName = getNameOfEmail(email);
-              if (!!sipName) memberNeedToCall.push({ type: MemberType.USER, name: `${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}` });
+              if (!!sipName) {
+                memberNeedToCall.push({ type: MemberType.USER, name: `${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}` });
+                const user = {};
+                user[`${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}`] = member.id;
+                userId.push(user);
+              }
             }
           });
           if (call_setting_welcome_media) {
@@ -178,7 +208,12 @@ export class CallControllerService {
           members.forEach(member => {
             const { email } = member;
             const sipName = getNameOfEmail(email);
-            if (!!sipName) memberNeedToCall.push({ type: MemberType.USER, name: `${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}` });
+            if (!!sipName) {
+              memberNeedToCall.push({ type: MemberType.USER, name: `${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}` });
+              const user = {};
+              user[`${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}`] = member.id;
+              userId.push(user);
+            }
           });
           if (call_setting_welcome_media) {
             welcomeMedia = call_setting_welcome_media;
@@ -196,7 +231,12 @@ export class CallControllerService {
           memberInOtherGroup.forEach(member => {
             const { email } = member;
             const sipName = getNameOfEmail(email);
-            if (!!sipName) memberNeedToCall.push({ type: MemberType.USER, name: `${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}` });
+            if (!!sipName) {
+              memberNeedToCall.push({ type: MemberType.USER, name: `${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}` });
+              const user = {};
+              user[`${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}`] = member.id;
+              userId.push(user);
+            }
           });
 
           if (call_setting_welcome_media) {
@@ -210,7 +250,12 @@ export class CallControllerService {
             if (member.auto_assign) {
               const { email } = member;
               const sipName = getNameOfEmail(email);
-              if (!!sipName) memberNeedToCall.push({ type: MemberType.USER, name: `${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}` });
+              if (!!sipName) {
+                memberNeedToCall.push({ type: MemberType.USER, name: `${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}` });
+                const user = {};
+                user[`${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}`] = member.id;
+                userId.push(user);
+              }
             }
           });
           if (call_setting_welcome_media) {
@@ -228,12 +273,22 @@ export class CallControllerService {
           if (owner) {
             const { email } = owner;
             const sipName = getNameOfEmail(email);
-            if (!!sipName) memberNeedToCall.push({ type: MemberType.USER, name: `${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}` });
+            if (!!sipName) {
+              memberNeedToCall.push({ type: MemberType.USER, name: `${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}` });
+              const user = {};
+              user[`${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}`] = owner.id;
+              userId.push(user);
+            }
           } else {
             members.forEach(member => {
               const { email } = member;
               const sipName = getNameOfEmail(email);
-              if (!!sipName) memberNeedToCall.push({ type: MemberType.USER, name: `${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}` });
+              if (!!sipName) {
+                memberNeedToCall.push({ type: MemberType.USER, name: `${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}` });
+                const user = {};
+                user[`${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}`] = member.id;
+                userId.push(user);
+              }
             });
           }
           if (call_setting_welcome_media) {
@@ -261,6 +316,7 @@ export class CallControllerService {
         fromNumber,
         isHangup,
         memberNeedToCall,
+        userId,
         isEnableRecord: call_setting_auto_record,
         isEnableVoiceMail,
         isForwardCall,

@@ -3,11 +3,13 @@ import { AppModule } from "./app.module";
 const { WebhookResponse } = require("@jambonz/node-client");
 import { recordAudio } from "./utils/recordUtils";
 import WebSocket, { WebSocketServer } from "ws";
-import 'dotenv/config'
+import "dotenv/config";
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-
+  app.enableCors({
+    origin: "http://localhost:3000",
+  });
   const opts = Object.assign({
     timestamp: () => `, "time": "${new Date().toISOString()}"`,
     level: process.env.LOGLEVEL || "info",
