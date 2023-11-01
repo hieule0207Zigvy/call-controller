@@ -572,7 +572,7 @@ export class CallControllerController {
   async callStatus(@Req() req: Request, @Res() res: Response): Promise<any> {
     const { conferenceName } = req.params;
     const { call_sid, sip_status, call_status, to } = req.body;
-    console.log("🚀 ~ file: call-controller.controller.ts:565 ~ CallControllerController ~ callStatus ~ call_status:", { call_status, to, body: req.body });
+    console.log("🚀 ~ file: call-controller.controller.ts:575 ~ CallControllerController ~ callStatus ~ req.body:", req.body)
     const currentCallLog: IConfCall = await this.callControllerService.getCallLogOfCall(conferenceName);
     const { members = [], listPhoneFirstInviteRinging = [] } = currentCallLog;
     const updateMemberList = members;
@@ -593,7 +593,6 @@ export class CallControllerController {
       await this.callControllerService.setCallLogToRedis(conferenceName, { members: updateMemberList, listPhoneFirstInviteRinging }, currentCallLog);
       const log = { ...currentCallLog, ...{ members: updateMemberList, listPhoneFirstInviteRinging } };
       const response = await axios.post(`${process.env.CHATCHILLA_BACKEND_URL}/voice-log`, { log });
-      console.log("🚀 ~ file: call-controller.controller.ts:597 ~ CallControllerController ~ callStatus ~ response:", response)
       return res.sendStatus(200);
     }
     if (call_status === CallStatus.in_progress && !memberIds.includes(call_sid)) {
@@ -622,7 +621,6 @@ export class CallControllerController {
     const log = { ...currentCallLog, members: updateMemberList };
     const response = await axios.post(`${process.env.CHATCHILLA_BACKEND_URL}/voice-log`, { log });
     return res.sendStatus(200);
-    console.log("🚀 ~ file: call-controller.controller.ts:625 ~ CallControllerController ~ callStatus ~ response:", response)
   }
 
   @Post("conference-status")
@@ -671,7 +669,6 @@ export class CallControllerController {
         await this.callControllerService.updateMemberAndStateOfEndedConference(currentCallLog, body);
       }
       const log = await this.callControllerService.getCallLogOfCall(friendly_name);
-      console.log("🚀 ~ file: call-controller.controller.ts:672 ~ CallControllerController ~ conferenceStatus ~ log:", log)
       const response = await axios.post(`${process.env.CHATCHILLA_BACKEND_URL}/voice-log`, { log });
       return res.sendStatus(200);
     } catch (error) {

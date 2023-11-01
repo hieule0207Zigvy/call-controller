@@ -372,14 +372,14 @@ export class CallControllerService {
 
   updateListMemberOfConference = async (currentCallLog: IConfCall, jambonzLog: any) => {
     const { call_sid, event, friendly_name, time, members } = jambonzLog;
-    const newMembers = currentCallLog.members || [];
+    const newMembers = currentCallLog?.members || [];
     newMembers.forEach((m: ILegMember) => {
       if (call_sid === m.callId) {
         m.status = LegMemberStatus[event];
         m.eventTime = time;
       }
     });
-    const newData = { members: newMembers, currentMemberInConf: members, masterCallId: currentCallLog.masterCallId };
+    const newData = { members: newMembers, currentMemberInConf: members, masterCallId: currentCallLog?.masterCallId };
     if (!currentCallLog.masterCallId) newData.masterCallId = call_sid;
     await this.setCallLogToRedis(friendly_name, newData, currentCallLog);
   };
