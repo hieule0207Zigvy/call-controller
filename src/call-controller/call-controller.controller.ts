@@ -127,6 +127,7 @@ export class CallControllerController {
         // conference created
         res.status(200).json(app);
         const initCallLog: IConfCall = {
+          caller: from,
           isOneOfMemberAnswer: false,
           confUniqueName: uniqNameConference,
           masterCallId: "",
@@ -227,6 +228,7 @@ export class CallControllerController {
       }); // conference created.
 
       const initCallLog: IConfCall = {
+        caller: fromDid,
         isOneOfMemberAnswer: false,
         confUniqueName: uniqNameConference,
         masterCallId: "",
@@ -351,7 +353,9 @@ export class CallControllerController {
   @Post("mute-member-conference")
   async muteMemberConference(@Req() req: Request, @Res() res: Response): Promise<any> {
     try {
-      const { conf_mute_status = "mute", call_sid } = req.body;
+      const { conf_mute_status = "mute", call_sid, conferenceName } = req.body;
+      console.log("🚀 ~ file: call-controller.controller.ts:357 ~ CallControllerController ~ muteMemberConference ~ req.body:", req.body);
+      const currentCallLog: IConfCall = await this.callControllerService.getCallLogOfCall(conferenceName);
       const response = await axios.put(
         `${process.env.JAMBONZ_REST_API_BASE_URL}/Accounts/${process.env.JAMBONZ_ACCOUNT_SID}/Calls/${call_sid}`,
         { conf_mute_status },
@@ -361,6 +365,23 @@ export class CallControllerController {
           },
         },
       );
+      const { members = [] } = currentCallLog;
+      const updateMemberList = members;
+      if (call_sid === currentCallLog.masterCallId) {
+        await this.callControllerService.setCallLogToRedis(conferenceName, { isMute: conf_mute_status === "mute" }, currentCallLog);
+        const log = { ...currentCallLog, isMute: conf_mute_status === "mute" };
+        const sendResponse = await axios.post(`${process.env.CHATCHILLA_BACKEND_URL}/voice-log`, { log });
+      } else {
+        updateMemberList.forEach(member => {
+          if (member.callId === call_sid) {
+            member.isMute = conf_mute_status === "mute";
+          }
+        });
+        const log = { ...currentCallLog, members: updateMemberList };
+        const sendResponse = await axios.post(`${process.env.CHATCHILLA_BACKEND_URL}/voice-log`, { log });
+      }
+      await this.callControllerService.setCallLogToRedis(conferenceName, { members: updateMemberList }, currentCallLog);
+
       return res.status(response?.status).json({ status: response?.status });
     } catch (err) {
       console.log("🚀 ~ file: call-controller.controller.ts:355 ~ CallControllerController ~ muteMemberConference ~ err:", err);
@@ -370,7 +391,9 @@ export class CallControllerController {
 
   @Post("remove-member-conference")
   async removeMemberConference(@Req() req: Request, @Res() res: Response): Promise<any> {
-    const { call_sid } = req.body;
+    const { call_sid, conferenceName } = req.body;
+    const currentCallLog: IConfCall = await this.callControllerService.getCallLogOfCall(conferenceName);
+    const isMasterCall = currentCallLog.masterCallId === call_sid;
     try {
       const response = await axios.put(
         `${process.env.JAMBONZ_REST_API_BASE_URL}/Accounts/${process.env.JAMBONZ_ACCOUNT_SID}/Calls/${call_sid}`,
@@ -381,6 +404,11 @@ export class CallControllerController {
           },
         },
       );
+      if (isMasterCall) {
+        await this.callControllerService.setCallLogToRedis(conferenceName, { isCallerLeft: true }, currentCallLog);
+        const log = { ...currentCallLog, isCallerLeft: true };
+        const sendResponse = await axios.post(`${process.env.CHATCHILLA_BACKEND_URL}/voice-log`, { log });
+      }
       return res.status(response?.status).json({ status: response?.status, call_sid });
     } catch (err) {
       if (err?.response?.status === 422) {
@@ -394,8 +422,15 @@ export class CallControllerController {
               },
             },
           );
+          if (isMasterCall) {
+            await this.callControllerService.setCallLogToRedis(conferenceName, { isCallerLeft: true }, currentCallLog);
+            const log = { ...currentCallLog, isCallerLeft: true };
+            const sendResponse = await axios.post(`${process.env.CHATCHILLA_BACKEND_URL}/voice-log`, { log });
+          }
           return res.status(response?.status).json({ status: response?.status, call_sid });
-        } catch (error) {}
+        } catch (error) {
+          return res.sendStatus(500);
+        }
       }
       return res.sendStatus(500);
     }
@@ -572,7 +607,7 @@ export class CallControllerController {
   async callStatus(@Req() req: Request, @Res() res: Response): Promise<any> {
     const { conferenceName } = req.params;
     const { call_sid, sip_status, call_status, to } = req.body;
-    console.log("🚀 ~ file: call-controller.controller.ts:575 ~ CallControllerController ~ callStatus ~ req.body:", req.body)
+    console.log("🚀 ~ file: call-controller.controller.ts:575 ~ CallControllerController ~ callStatus ~ req.body:", req.body);
     const currentCallLog: IConfCall = await this.callControllerService.getCallLogOfCall(conferenceName);
     const { members = [], listPhoneFirstInviteRinging = [] } = currentCallLog;
     const updateMemberList = members;

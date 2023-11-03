@@ -380,7 +380,7 @@ export class CallControllerService {
       }
     });
     const newData = { members: newMembers, currentMemberInConf: members, masterCallId: currentCallLog?.masterCallId };
-    if (!currentCallLog.masterCallId) newData.masterCallId = call_sid;
+    if (!currentCallLog?.masterCallId) newData.masterCallId = call_sid;
     await this.setCallLogToRedis(friendly_name, newData, currentCallLog);
   };
 

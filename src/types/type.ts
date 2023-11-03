@@ -18,9 +18,11 @@ export interface ILegMember {
   value: string;
   status: LegMemberStatus;
   eventTime?: Date;
+  isMute?: boolean;
 }
 
 export interface IConfCall {
+  caller: string;
   isOneOfMemberAnswer: boolean;
   confUniqueName: string;
   masterCallId: string;
@@ -40,6 +42,8 @@ export interface IConfCall {
   queueTimeout?: number;
   isTriggerQueueMedia?: boolean;
   isWelcomeMedia?: boolean;
+  isMute?: boolean;
+  isCallerLeft?: boolean;
 }
 
 export interface ITypeOfToUser {
