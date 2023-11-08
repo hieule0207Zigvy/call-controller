@@ -354,7 +354,6 @@ export class CallControllerController {
   async muteMemberConference(@Req() req: Request, @Res() res: Response): Promise<any> {
     try {
       const { conf_mute_status = "mute", call_sid, conferenceName } = req.body;
-      console.log("🚀 ~ file: call-controller.controller.ts:357 ~ CallControllerController ~ muteMemberConference ~ req.body:", req.body);
       const currentCallLog: IConfCall = await this.callControllerService.getCallLogOfCall(conferenceName);
       const response = await axios.put(
         `${process.env.JAMBONZ_REST_API_BASE_URL}/Accounts/${process.env.JAMBONZ_ACCOUNT_SID}/Calls/${call_sid}`,
@@ -367,7 +366,7 @@ export class CallControllerController {
       );
       const { members = [] } = currentCallLog;
       const updateMemberList = members;
-      if (call_sid === currentCallLog.masterCallId) {
+      if (call_sid === currentCallLog?.masterCallId) {
         await this.callControllerService.setCallLogToRedis(conferenceName, { isMute: conf_mute_status === "mute" }, currentCallLog);
         const log = { ...currentCallLog, isMute: conf_mute_status === "mute" };
         const sendResponse = await axios.post(`${process.env.CHATCHILLA_BACKEND_URL}/voice-log`, { log });
@@ -393,7 +392,7 @@ export class CallControllerController {
   async removeMemberConference(@Req() req: Request, @Res() res: Response): Promise<any> {
     const { call_sid, conferenceName } = req.body;
     const currentCallLog: IConfCall = await this.callControllerService.getCallLogOfCall(conferenceName);
-    const isMasterCall = currentCallLog.masterCallId === call_sid;
+    const isMasterCall = currentCallLog?.masterCallId === call_sid;
     try {
       const response = await axios.put(
         `${process.env.JAMBONZ_REST_API_BASE_URL}/Accounts/${process.env.JAMBONZ_ACCOUNT_SID}/Calls/${call_sid}`,
@@ -687,7 +686,7 @@ export class CallControllerController {
         }
       }
       if (event === ConferenceType.JOIN && isMemberCall) {
-        if (!isOutboundCall) await this.callControllerService.removeQueueMedia(currentCallLog.masterCallId, friendly_name);
+        if (!isOutboundCall) await this.callControllerService.removeQueueMedia(currentCallLog?.masterCallId, friendly_name);
         const newestData = await this.callControllerService.getCallLogOfCall(friendly_name);
         await this.callControllerService.reMappingMemberList(newestData, body);
       }
