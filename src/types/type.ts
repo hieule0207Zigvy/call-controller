@@ -44,6 +44,7 @@ export interface IConfCall {
   isWelcomeMedia?: boolean;
   isMute?: boolean;
   isCallerLeft?: boolean;
+  duration?: string;
 }
 
 export interface ITypeOfToUser {

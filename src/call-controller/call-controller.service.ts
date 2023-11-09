@@ -459,7 +459,7 @@ export class CallControllerService {
   };
 
   updateMemberAndStateOfEndedConference = async (currentCallLog: IConfCall, jambonzLog: any) => {
-    const { friendly_name, time } = jambonzLog;
+    const { friendly_name, time, duration } = jambonzLog;
     const filterRingingCallSid = currentCallLog.members.filter((member: ILegMember) => member.status === LegMemberStatus.calling).map((member: ILegMember) => member.callId);
     await this.endAllRingingCall(filterRingingCallSid);
     const currentMembers = currentCallLog.members;
@@ -467,7 +467,7 @@ export class CallControllerService {
       member.status = LegMemberStatus.leave;
       member.eventTime = time;
     });
-    const newData = { status: ConfCallStatus.END, members: currentMembers, fallOverTimeOutSid: null, currentMemberInConf: 0, eventTime: time };
+    const newData = { status: ConfCallStatus.END, members: currentMembers, fallOverTimeOutSid: null, currentMemberInConf: 0, eventTime: time, duration };
     await this.setCallLogToRedis(friendly_name, newData, currentCallLog);
   };
 }

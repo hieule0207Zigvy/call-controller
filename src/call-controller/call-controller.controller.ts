@@ -389,10 +389,102 @@ export class CallControllerController {
   }
 
   @Post("remove-member-conference")
+  // async removeMemberConference(@Req() req: Request, @Res() res: Response): Promise<any> {
+  //   const { call_sid, conferenceName } = req.body;
+  //   const currentCallLog: IConfCall = await this.callControllerService.getCallLogOfCall(conferenceName);
+  //   const isMasterCall = currentCallLog?.masterCallId === call_sid;
+  //   try {
+  //     const response = await axios.put(
+  //       `${process.env.JAMBONZ_REST_API_BASE_URL}/Accounts/${process.env.JAMBONZ_ACCOUNT_SID}/Calls/${call_sid}`,
+  //       { call_status: "no-answer" },
+  //       {
+  //         headers: {
+  //           Authorization: `Bearer ${process.env.JAMBONZ_API_KEY}`,
+  //         },
+  //       },
+  //     );
+  //     if (isMasterCall) {
+  //       await this.callControllerService.setCallLogToRedis(conferenceName, { isCallerLeft: true }, currentCallLog);
+  //       const log = { ...currentCallLog, isCallerLeft: true };
+  //       const sendResponse = await axios.post(`${process.env.CHATCHILLA_BACKEND_URL}/voice-log`, { log });
+  //     }
+  //     return res.status(response?.status).json({ status: response?.status, call_sid });
+  //   } catch (err) {
+  //     if (err?.response?.status === 422) {
+  //       try {
+  //         const response = await axios.put(
+  //           `${process.env.JAMBONZ_REST_API_BASE_URL}/Accounts/${process.env.JAMBONZ_ACCOUNT_SID}/Calls/${call_sid}`,
+  //           { call_status: "completed" },
+  //           {
+  //             headers: {
+  //               Authorization: `Bearer ${process.env.JAMBONZ_API_KEY}`,
+  //             },
+  //           },
+  //         );
+  //         if (isMasterCall) {
+  //           await this.callControllerService.setCallLogToRedis(conferenceName, { isCallerLeft: true }, currentCallLog);
+  //           const log = { ...currentCallLog, isCallerLeft: true };
+  //           const sendResponse = await axios.post(`${process.env.CHATCHILLA_BACKEND_URL}/voice-log`, { log });
+  //         }
+  //         return res.status(response?.status).json({ status: response?.status, call_sid });
+  //       } catch (error) {
+  //         return res.sendStatus(500);
+  //       }
+  //     }
+  //     return res.sendStatus(500);
+  //   }
+  // }
   async removeMemberConference(@Req() req: Request, @Res() res: Response): Promise<any> {
     const { call_sid, conferenceName } = req.body;
     const currentCallLog: IConfCall = await this.callControllerService.getCallLogOfCall(conferenceName);
     const isMasterCall = currentCallLog?.masterCallId === call_sid;
+
+    if (isMasterCall) {
+      const allCallIdInCall = [];
+      allCallIdInCall.push(currentCallLog?.masterCallId);
+      const { members = [] } = currentCallLog;
+      members.forEach(member => {
+        if (member?.status === LegMemberStatus.join || member?.status === LegMemberStatus.calling) {
+          allCallIdInCall.push(member?.callId);
+        }
+      });
+      await this.callControllerService.endAllRingingCall(allCallIdInCall);
+      await this.callControllerService.setCallLogToRedis(conferenceName, { isCallerLeft: true }, currentCallLog);
+      const log = { ...currentCallLog, isCallerLeft: true };
+      const sendResponse = await axios.post(`${process.env.CHATCHILLA_BACKEND_URL}/voice-log`, { log });
+      return res.status(202).json({ status: 202 });
+    } else {
+      try {
+        const response = await axios.put(
+          `${process.env.JAMBONZ_REST_API_BASE_URL}/Accounts/${process.env.JAMBONZ_ACCOUNT_SID}/Calls/${call_sid}`,
+          { call_status: "no-answer" },
+          {
+            headers: {
+              Authorization: `Bearer ${process.env.JAMBONZ_API_KEY}`,
+            },
+          },
+        );
+        return res.status(response?.status).json({ status: response?.status, call_sid });
+      } catch (err) {
+        if (err?.response?.status === 422) {
+          try {
+            const response = await axios.put(
+              `${process.env.JAMBONZ_REST_API_BASE_URL}/Accounts/${process.env.JAMBONZ_ACCOUNT_SID}/Calls/${call_sid}`,
+              { call_status: "completed" },
+              {
+                headers: {
+                  Authorization: `Bearer ${process.env.JAMBONZ_API_KEY}`,
+                },
+              },
+            );
+            return res.status(response?.status).json({ status: response?.status });
+          } catch (error) {
+            return res.sendStatus(500);
+          }
+        }
+        return res.sendStatus(500);
+      }
+    }
     try {
       const response = await axios.put(
         `${process.env.JAMBONZ_REST_API_BASE_URL}/Accounts/${process.env.JAMBONZ_ACCOUNT_SID}/Calls/${call_sid}`,
@@ -404,9 +496,6 @@ export class CallControllerController {
         },
       );
       if (isMasterCall) {
-        await this.callControllerService.setCallLogToRedis(conferenceName, { isCallerLeft: true }, currentCallLog);
-        const log = { ...currentCallLog, isCallerLeft: true };
-        const sendResponse = await axios.post(`${process.env.CHATCHILLA_BACKEND_URL}/voice-log`, { log });
       }
       return res.status(response?.status).json({ status: response?.status, call_sid });
     } catch (err) {
@@ -661,7 +750,7 @@ export class CallControllerController {
   async conferenceStatus(@Req() req: Request, @Res() res: Response): Promise<any> {
     try {
       const { body } = req;
-      const { conference_sid, event, members, friendly_name, call_sid, to, time, direction } = body;
+      const { conference_sid, event, members, friendly_name, call_sid, to, time, direction, duration } = body;
       if (!event) return res.sendStatus(200);
       console.log("🚀 ~ file: call-controller.controller.ts:258 ~ CallControllerController ~ conferenceStatus:", body);
       const currentCallLog: IConfCall = await this.callControllerService.getCallLogOfCall(friendly_name);
