@@ -35,20 +35,13 @@ export class CallControllerController {
       // call api to chatchilla to get all did.
       //if from is one of did of chatchilla, do nothing. Already handle in agent create conference.
       const checkDidResponse = await axios.post(`${process.env.CHATCHILLA_BACKEND_URL}/dids/check_did`, { did: from });
-
       if (checkDidResponse.status !== 200) return res.status(500);
-
       const isCallComeFromChatchillaDid = checkDidResponse?.data?.isDid;
-
       if (!isCallComeFromChatchillaDid) {
         const groupCallSettingResponse = await axios.post(`${process.env.CHATCHILLA_BACKEND_URL}/group/call_settings`, {
           DID: to,
           CustomerNumber: from,
         });
-        console.log(
-          "🚀 ~ file: call-controller.controller.ts:49 ~ CallControllerController ~ callerCreateConference ~ groupCallSettingResponse?.data:",
-          groupCallSettingResponse?.data,
-        );
         if (groupCallSettingResponse?.status !== 200 || !groupCallSettingResponse?.data?.call_settings) return res.status(500);
         const callSettingData = groupCallSettingResponse?.data?.call_settings;
         const conversationId = groupCallSettingResponse?.data?.conversationId;
@@ -80,7 +73,6 @@ export class CallControllerController {
           }
           return res.status(200).json(app);
         }
-
         if (isEnableRecord) {
           // enable recording.
           // app.config({
@@ -92,7 +84,6 @@ export class CallControllerController {
           // });
           // end record
         }
-
         if (isForwardCall) {
           app
             .tag({
@@ -485,43 +476,6 @@ export class CallControllerController {
         return res.sendStatus(500);
       }
     }
-    try {
-      const response = await axios.put(
-        `${process.env.JAMBONZ_REST_API_BASE_URL}/Accounts/${process.env.JAMBONZ_ACCOUNT_SID}/Calls/${call_sid}`,
-        { call_status: "no-answer" },
-        {
-          headers: {
-            Authorization: `Bearer ${process.env.JAMBONZ_API_KEY}`,
-          },
-        },
-      );
-      if (isMasterCall) {
-      }
-      return res.status(response?.status).json({ status: response?.status, call_sid });
-    } catch (err) {
-      if (err?.response?.status === 422) {
-        try {
-          const response = await axios.put(
-            `${process.env.JAMBONZ_REST_API_BASE_URL}/Accounts/${process.env.JAMBONZ_ACCOUNT_SID}/Calls/${call_sid}`,
-            { call_status: "completed" },
-            {
-              headers: {
-                Authorization: `Bearer ${process.env.JAMBONZ_API_KEY}`,
-              },
-            },
-          );
-          if (isMasterCall) {
-            await this.callControllerService.setCallLogToRedis(conferenceName, { isCallerLeft: true }, currentCallLog);
-            const log = { ...currentCallLog, isCallerLeft: true };
-            const sendResponse = await axios.post(`${process.env.CHATCHILLA_BACKEND_URL}/voice-log`, { log });
-          }
-          return res.status(response?.status).json({ status: response?.status, call_sid });
-        } catch (error) {
-          return res.sendStatus(500);
-        }
-      }
-      return res.sendStatus(500);
-    }
   }
   // hook
   @Get("person-join-conference/:conferenceName")
@@ -752,8 +706,8 @@ export class CallControllerController {
       const { body } = req;
       const { conference_sid, event, members, friendly_name, call_sid, to, time, direction, duration } = body;
       if (!event) return res.sendStatus(200);
-      console.log("🚀 ~ file: call-controller.controller.ts:258 ~ CallControllerController ~ conferenceStatus:", body);
       const currentCallLog: IConfCall = await this.callControllerService.getCallLogOfCall(friendly_name);
+      console.log("🚀 ~ file: call-controller.controller.ts:258 ~ CallControllerController ~ conferenceStatus:", body);
       const listPhoneFirstInviteRinging = currentCallLog?.listPhoneFirstInviteRinging || [];
       const isEnableQueueMedia = !!currentCallLog?.queueTimeout && currentCallLog?.isWelcomeMedia;
       const isTriggerQueueMedia = currentCallLog?.isTriggerQueueMedia;
@@ -775,7 +729,7 @@ export class CallControllerController {
         }
       }
       if (event === ConferenceType.JOIN && isMemberCall) {
-        if (!isOutboundCall) await this.callControllerService.removeQueueMedia(currentCallLog?.masterCallId, friendly_name);
+        if (!isOutboundCall && isEnableQueueMedia && isTriggerQueueMedia) await this.callControllerService.removeQueueMedia(currentCallLog?.masterCallId, friendly_name);
         const newestData = await this.callControllerService.getCallLogOfCall(friendly_name);
         await this.callControllerService.reMappingMemberList(newestData, body);
       }

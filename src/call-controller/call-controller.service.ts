@@ -19,6 +19,7 @@ export class CallControllerService {
   private expiredTime = 3 * Timer.month;
 
   async endAllRingingCall(callSids: string[]): Promise<any> {
+    if (callSids.length === 0) return;
     try {
       Promise.all(
         callSids.map(async (callSid: string) => {
@@ -53,7 +54,7 @@ export class CallControllerService {
           }
         }),
       );
-      return true;
+      return;
     } catch (error) {
       console.log("🚀 ~ file: call-controller.service.ts:40 ~ CallControllerService ~ endAllRingingCall ~ error:", error);
     }

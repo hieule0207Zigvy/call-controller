@@ -53,3 +53,10 @@ export enum CallStatus {
   early_media = "early-media",
   in_progress = "in-progress",
 }
+
+export enum SampleMedia {
+  welcomeMedia = "",
+  queueMedia = "https://smartonhold.com.au/wp-content/uploads/2021/11/FEMALE-DEMO-2-Inga-Feitsma-5-11-21.mp3",
+  timeoutMedia = "https://smartonhold.com.au/wp-content/uploads/2023/07/Male-Demo-Rick-Davey.mp3",
+  voicemailMedia = "https://smartonhold.com.au/wp-content/uploads/2023/04/Male-Demo-1Mark-Fox.mp3",
+}
