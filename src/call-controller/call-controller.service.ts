@@ -19,9 +19,10 @@ export class CallControllerService {
   private expiredTime = 3 * Timer.month;
 
   async endAllRingingCall(callSids: string[]): Promise<any> {
-    if (callSids.length === 0) return;
+    if (callSids.length === 0) return false;
+    let isSuccess = true;
     try {
-      Promise.all(
+      await Promise.all(
         callSids.map(async (callSid: string) => {
           try {
             const response = await axios.put(
@@ -46,17 +47,21 @@ export class CallControllerService {
                   },
                 );
               } catch (error) {
+                if (error?.response?.status === 422) {
+                  console.log("🚀 ~ file: call-controller.service.ts:50 ~ CallControllerService ~ callSids.map ~ error?.status:", error?.response?.status);
+                  isSuccess = false;
+                }
                 console.log("🚀 ~ file: call-controller.service.ts:48 ~ CallControllerService ~ callSids.map ~ error:", error);
+                isSuccess = false;
               }
-            } else {
-              console.log("🚀 ~ file: call-controller.service.ts:36 ~ CallControllerService ~ callSids.map ~ err:", err);
             }
           }
         }),
       );
-      return;
+      return isSuccess;
     } catch (error) {
       console.log("🚀 ~ file: call-controller.service.ts:40 ~ CallControllerService ~ endAllRingingCall ~ error:", error);
+      return false;
     }
   }
 

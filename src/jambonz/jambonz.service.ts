@@ -1,6 +1,113 @@
 import { Injectable } from "@nestjs/common";
 import axios from "axios";
+import { getNameOfEmail } from "src/utils/until";
 const jambonz = require("@jambonz/node-client");
+
+export const DefaultSipGateway = [
+  {
+    ipv4: "54.65.63.192",
+    netmask: 30,
+    port: 5060,
+    inbound: 1,
+    outbound: 0,
+    voip_carrier_sid: "",
+    is_active: 1,
+    protocol: "udp",
+    pad_crypto: 0,
+  },
+  {
+    ipv4: "54.171.127.192",
+    netmask: 30,
+    port: 5060,
+    inbound: 1,
+    outbound: 0,
+    voip_carrier_sid: "",
+    is_active: 1,
+    protocol: "udp",
+    pad_crypto: 0,
+  },
+  {
+    ipv4: "54.169.127.128",
+    netmask: 30,
+    port: 5060,
+    inbound: 1,
+    outbound: 0,
+    voip_carrier_sid: "",
+    is_active: 1,
+    protocol: "udp",
+    pad_crypto: 0,
+  },
+  {
+    ipv4: "168.86.128.0",
+    netmask: 18,
+    port: 5060,
+    inbound: 1,
+    outbound: 0,
+    voip_carrier_sid: "",
+    is_active: 1,
+    protocol: "udp",
+    pad_crypto: 0,
+  },
+  {
+    ipv4: "54.244.51.0",
+    netmask: 30,
+    port: 5060,
+    inbound: 1,
+    outbound: 0,
+    voip_carrier_sid: "",
+    is_active: 1,
+    protocol: "udp",
+    pad_crypto: 0,
+  },
+  {
+    sip_gateway_sid: "",
+    ipv4: "35.156.191.128",
+    netmask: 30,
+    port: 5060,
+    inbound: 1,
+    outbound: 0,
+    voip_carrier_sid: "",
+    is_active: 1,
+    protocol: "udp",
+    pad_crypto: 0,
+  },
+  {
+    sip_gateway_sid: "",
+    ipv4: "54.172.60.0",
+    netmask: 30,
+    port: 5060,
+    inbound: 1,
+    outbound: 0,
+    voip_carrier_sid: "",
+    is_active: 1,
+    protocol: "udp",
+    pad_crypto: 0,
+  },
+  {
+    sip_gateway_sid: "",
+    ipv4: "177.71.206.192",
+    netmask: 30,
+    port: 5060,
+    inbound: 1,
+    outbound: 0,
+    voip_carrier_sid: "",
+    is_active: 1,
+    protocol: "udp",
+    pad_crypto: 0,
+  },
+  {
+    sip_gateway_sid: "",
+    ipv4: "54.252.254.64",
+    netmask: 30,
+    port: 5060,
+    inbound: 1,
+    outbound: 0,
+    voip_carrier_sid: "",
+    is_active: 1,
+    protocol: "udp",
+    pad_crypto: 0,
+  },
+];
 
 @Injectable()
 export class JambonzService {
@@ -9,20 +116,32 @@ export class JambonzService {
   });
 
   createTwilioVoidCarrier = async (carrierData: any) => {
+    const { trunkData, email, username } = carrierData;
+    if (!trunkData || !email || !username) return false;
     try {
-      const twilioCarrierSid = process.env.TWILIO_SERVICE_ID;
+      const emailName = getNameOfEmail(email);
+      const loginPayload = {
+        username: process.env.JAMBONZ_USERNAME,
+        password: process.env.JAMBONZ_PASSWORD,
+      };
+      const loginResponse: any = await axios.post(`${process.env.JAMBONZ_REST_API_BASE_URL}/login`, loginPayload);
+      if (loginResponse?.status !== 200) {
+        return false;
+      }
+      const authToken = loginResponse?.data?.token;
       const defaultInboundApplicationSid = process.env.DEFAULT_INBOUND_APP_ID;
       const accountSid = process.env.JAMBONZ_ACCOUNT_SID;
-      const defaultServiceSid = process.env.SERVICE_PROVIDER;
-      const params = {
-        name: "Twilio-test8testing",
+      const defaultServiceSid = process.env.TWILIO_SERVICE_PROVIDER;
+      const defaultTwilioSipPassword = process.env.TWILIO_DEFAULT_SIP_CREDENTIAL_PASSWORD
+      const voidCarrierParams = {
+        name: `${emailName}-twilio-carrier`,
         e164_leading_plus: 1,
         application_sid: defaultInboundApplicationSid,
         service_provider_sid: defaultServiceSid,
         account_sid: accountSid,
         requires_register: false,
-        register_username: "test8",
-        register_password: "yZwMnZ3ATSFAVw.MRS5",
+        register_username: username,
+        register_password: defaultTwilioSipPassword,
         register_sip_realm: null,
         register_from_user: null,
         register_from_domain: null,
@@ -35,38 +154,49 @@ export class JambonzService {
         smpp_inbound_system_id: null,
         smpp_inbound_password: null,
       };
-      const voidTwilioCarrierResponse = await axios
-        .post(`${process.env.JAMBONZ_REST_API_BASE_URL}/Accounts/${process.env.JAMBONZ_ACCOUNT_SID}/VoipCarriers`, params, {
+      const voidTwilioCarrierResponse: any = await axios
+        .post(`${process.env.JAMBONZ_REST_API_BASE_URL}/Accounts/${process.env.JAMBONZ_ACCOUNT_SID}/VoipCarriers`, voidCarrierParams, {
           headers: {
             Authorization: `Bearer ${process.env.JAMBONZ_API_KEY}`,
           },
         })
         .catch(err => console.log("🚀 ~ file: call-controller.service.ts:33 ~ CallControllerService ~ callSids.map ~ err:", err));
-
-      if (voidTwilioCarrierResponse && voidTwilioCarrierResponse.status === 201) {
-        const newCarrierSid = voidTwilioCarrierResponse.data.sid;
-        const sipGatewayOption = {
-          ipv4: "pbx-cce67b2d-2361-4b17-955e-72249c0a1f3a.pstn.twilio.com",
-          netmask: 32,
-          port: 5060,
-          inbound: 0,
-          outbound: 1,
-          voip_carrier_sid: newCarrierSid,
-          is_active: 1,
-          protocol: "udp",
-          pad_crypto: 0,
-        };
-        const sipGatewayTwilioOutboundResponse = await axios
-          .post(`${process.env.JAMBONZ_REST_API_BASE_URL}/SipGateways`, sipGatewayOption, {
-            headers: {
-              Authorization: `Bearer ${process.env.JAMBONZ_API_KEY}`,
-            },
-          })
-          .catch(err => console.log("🚀 ~ file: call-controller.service.ts:33 ~ CallControllerService ~ callSids.map ~ err:", err));
-        console.log("🚀 ~ file: jambonz.service.ts:66 ~ JambonzService ~ createTwilioVoidCarrier= ~ sipGatewayTwilioInboundResponse:", sipGatewayTwilioOutboundResponse);
-      } else return false;
+      if (!voidTwilioCarrierResponse && voidTwilioCarrierResponse.status !== 201) return false;
+      const newCarrierSid = voidTwilioCarrierResponse.data.sid;
+      const sipGateWayList = DefaultSipGateway.map(item => ({ ...item, voip_carrier_sid: newCarrierSid }));
+      const sipGatewayOption = {
+        // ipv4: "pbx-cce67b2d-2361-4b17-955e-72249c0a1f3a.pstn.twilio.com",
+        ipv4: trunkData,
+        netmask: 32,
+        port: 5060,
+        inbound: 0,
+        outbound: 1,
+        voip_carrier_sid: newCarrierSid,
+        is_active: 1,
+        protocol: "udp",
+        pad_crypto: 0,
+      };
+      sipGateWayList.push(sipGatewayOption);
+      let isSipAddingFailed = false;
+      await Promise.all(
+        sipGateWayList.map(async sipData => {
+          try {
+            await axios.post(`${process.env.JAMBONZ_REST_API_BASE_URL}/SipGateways`, sipData, {
+              headers: {
+                Authorization: `Bearer ${authToken}`,
+              },
+            });
+          } catch (error) {
+            console.log("🚀 ~ file: jambonz.service.ts:186 ~ JambonzService ~ createTwilioVoidCarrier= ~ error:", error);
+            isSipAddingFailed = true;
+          }
+        }),
+      );
+      if (isSipAddingFailed) return false;
+      return true;
     } catch (error) {
-      return error;
+      console.log("🚀 ~ file: jambonz.service.ts:193 ~ JambonzService ~ createTwilioVoidCarrier= ~ error:", error);
+      return false;
     }
   };
 
@@ -104,8 +234,8 @@ export class JambonzService {
       const params = {
         account_sid: process.env.JAMBONZ_ACCOUNT_SID,
         application_sid: process.env.DEFAULT_INBOUND_APP_ID,
-        number: "+16161998349",
-        voip_carrier_sid: "03125a29-8ca2-4d0c-86de-ebc3fe5f57a3",
+        number: number,
+        voip_carrier_sid: voip_carrier_sid,
       };
       const phoneNumberResponse = await axios
         .post(`${process.env.JAMBONZ_REST_API_BASE_URL}/PhoneNumbers`, params, {

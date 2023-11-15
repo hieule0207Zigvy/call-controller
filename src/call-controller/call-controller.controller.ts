@@ -439,11 +439,11 @@ export class CallControllerController {
           allCallIdInCall.push(member?.callId);
         }
       });
-      await this.callControllerService.endAllRingingCall(allCallIdInCall);
+      const status = await this.callControllerService.endAllRingingCall(allCallIdInCall);
       await this.callControllerService.setCallLogToRedis(conferenceName, { isCallerLeft: true }, currentCallLog);
       const log = { ...currentCallLog, isCallerLeft: true };
       const sendResponse = await axios.post(`${process.env.CHATCHILLA_BACKEND_URL}/voice-log`, { log });
-      return res.status(202).json({ status: 202 });
+      return res.status(202).json({ status: status });
     } else {
       try {
         const response = await axios.put(
