@@ -116,10 +116,9 @@ export class JambonzService {
   });
 
   createTwilioVoidCarrier = async (carrierData: any) => {
-    const { trunkData, email, username } = carrierData;
-    if (!trunkData || !email || !username) return false;
+    const { trunkDomain, username } = carrierData;
+    if (!trunkDomain || !username) return false;
     try {
-      const emailName = getNameOfEmail(email);
       const loginPayload = {
         username: process.env.JAMBONZ_USERNAME,
         password: process.env.JAMBONZ_PASSWORD,
@@ -132,9 +131,9 @@ export class JambonzService {
       const defaultInboundApplicationSid = process.env.DEFAULT_INBOUND_APP_ID;
       const accountSid = process.env.JAMBONZ_ACCOUNT_SID;
       const defaultServiceSid = process.env.TWILIO_SERVICE_PROVIDER;
-      const defaultTwilioSipPassword = process.env.TWILIO_DEFAULT_SIP_CREDENTIAL_PASSWORD
+      const defaultTwilioSipPassword = process.env.TWILIO_DEFAULT_SIP_CREDENTIAL_PASSWORD;
       const voidCarrierParams = {
-        name: `${emailName}-twilio-carrier`,
+        name: `${trunkDomain}-twilio-carrier`,
         e164_leading_plus: 1,
         application_sid: defaultInboundApplicationSid,
         service_provider_sid: defaultServiceSid,
@@ -166,7 +165,7 @@ export class JambonzService {
       const sipGateWayList = DefaultSipGateway.map(item => ({ ...item, voip_carrier_sid: newCarrierSid }));
       const sipGatewayOption = {
         // ipv4: "pbx-cce67b2d-2361-4b17-955e-72249c0a1f3a.pstn.twilio.com",
-        ipv4: trunkData,
+        ipv4: `${trunkDomain}.pstn.twilio.com`,
         netmask: 32,
         port: 5060,
         inbound: 0,
@@ -193,7 +192,7 @@ export class JambonzService {
         }),
       );
       if (isSipAddingFailed) return false;
-      return true;
+      return newCarrierSid;
     } catch (error) {
       console.log("🚀 ~ file: jambonz.service.ts:193 ~ JambonzService ~ createTwilioVoidCarrier= ~ error:", error);
       return false;
@@ -201,30 +200,27 @@ export class JambonzService {
   };
 
   createSipAccount = async (account: any) => {
-    const { username, password = process.env.DEFAULT_SIP_CLIENT_PASSWORD } = account;
+    const { email } = account;
+    const emailName = getNameOfEmail(email);
     try {
       const params = {
         account_sid: process.env.JAMBONZ_ACCOUNT_SID,
-        username,
-        password,
+        username: emailName,
+        password: process.env.DEFAULT_SIP_CLIENT_PASSWORD,
         is_active: true,
       };
-      const clientResponse = await axios
-        .post(`${process.env.JAMBONZ_REST_API_BASE_URL}/Clients`, params, {
-          headers: {
-            Authorization: `Bearer ${process.env.JAMBONZ_API_KEY}`,
-          },
-        })
-        .catch(err => {
-          console.log("🚀 ~ file: jambonz.service.ts:83 ~ JambonzService ~ createSipAccount= ~ err:", err);
-          return;
-        });
-      if (clientResponse && clientResponse.status === 201) {
-        return clientResponse.data.sid;
+      const clientResponse = await axios.post(`${process.env.JAMBONZ_REST_API_BASE_URL}/Clients`, params, {
+        headers: {
+          Authorization: `Bearer ${process.env.JAMBONZ_API_KEY}`,
+        },
+      });
+
+      if (clientResponse && clientResponse?.status === 201) {
+        return clientResponse?.data?.sid;
       }
     } catch (error) {
       console.log("🚀 ~ file: jambonz.service.ts:78 ~ JambonzService ~ createSipAccount= ~ error:", error);
-      return error;
+      return false;
     }
   };
 
@@ -237,22 +233,17 @@ export class JambonzService {
         number: number,
         voip_carrier_sid: voip_carrier_sid,
       };
-      const phoneNumberResponse = await axios
-        .post(`${process.env.JAMBONZ_REST_API_BASE_URL}/PhoneNumbers`, params, {
-          headers: {
-            Authorization: `Bearer ${process.env.JAMBONZ_API_KEY}`,
-          },
-        })
-        .catch(err => {
-          console.log("🚀 ~ file: jambonz.service.ts:83 ~ JambonzService ~ createSipAccount= ~ err:", err);
-          return;
-        });
+      const phoneNumberResponse = await axios.post(`${process.env.JAMBONZ_REST_API_BASE_URL}/PhoneNumbers`, params, {
+        headers: {
+          Authorization: `Bearer ${process.env.JAMBONZ_API_KEY}`,
+        },
+      });
       if (phoneNumberResponse && phoneNumberResponse.status === 201) {
         return phoneNumberResponse.data.sid;
       }
     } catch (error) {
       console.log("🚀 ~ file: jambonz.service.ts:78 ~ JambonzService ~ createSipAccount= ~ error:", error);
-      return error;
+      return false;
     }
   };
 }
