@@ -1,0 +1,49 @@
+version: '1.0'
+services:
+  call-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: chatchilla-call-controller
+    ports:
+      - '3060:3060'
+    depends_on:
+      - redis
+    environment:
+      - HTTP_BASIC_USER=zigvy
+      - HTTP_BASIC_PASS=Zigvy123!@#
+      - NODE_ENV=production
+      - LOGLEVEL=info
+      - HTTP_PORT=3060
+      - JAMBONZ_ACCOUNT_SID=fbbbcf97-139e-4b99-81c5-58f482a42bf2
+      - JAMBONZ_API_KEY=599a2ea1-8d33-4ce7-ab9b-9e193c59beda
+      - JAMBONZ_REST_API_BASE_URL=https://jambonz.cloud/api/v1
+      - WEBHOOK_SECRET=wh_secret_nqSQdtTBhBePeq19qcTre1
+      - WS_RECORD_PATH=/record
+      - RECORD_BUCKET=test-recording-jambonz-s3
+      - AWS_REGION=us-east-1
+      - AWS_ACCESS_KEY_ID=AKIAQAO34SD7HJM2DM7E
+      - SECRET_ACCESS_KEY=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
+      - BACKEND_URL=https://8907-115-73-208-186.ngrok-free.app
+      - WEBSOCKET_URL=wss://a34a-2a09-bac1-7aa0-10-00-245-3c.ngrok-free.app
+      - CHATCHILLA_BACKEND_URL=https://chatchilladev.com/api
+      - CHATCHILLA_SIP_DOMAIN=voice.chatchilladev.sip.jambonz.cloud
+      - REDIS_PORT=6379
+      - REDIS_HOST=redis
+      - REDIS_CALL_SERVER_PREFIX=callLog
+      - REDIS_TTL=172800
+      - TWILIO_SERVICE_ID=d0366230-bb4d-47d3-8fef-311b143f3ece
+      - DEFAULT_INBOUND_APP_ID=cf8dd01c-9918-4938-bc74-e31a274ea136
+      - TWILIO_SERVICE_PROVIDER=6072f617-6151-4c15-8eb9-74a4967ab701
+      - DEFAULT_SIP_CLIENT_PASSWORD=test123
+      - JAMBONZ_USERNAME=dev@chatchilla.com
+      - JAMBONZ_PASSWORD=hjx!zpv3dwc1FMZ9yet
+      - TWILIO_DEFAULT_SIP_CREDENTIAL_PASSWORD=yZwMnZ3ATSFAVw.MRS5
+  redis:
+    image: redis
+    volumes:
+      - ./default.conf:/etc/nginx/conf.d/default.conf
+      - ./redis-data:/data
+    ports:
+      - '6379:6379'
+    command: [ 'redis-server', '/etc/nginx/conf.d/default.conf' ]
