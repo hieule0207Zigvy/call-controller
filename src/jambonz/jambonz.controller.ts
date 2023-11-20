@@ -7,9 +7,9 @@ export class JambonzController {
   constructor(private jambonzService: JambonzService) {}
 
   @Get()
-  async test(): Promise<any> {
+  async test(@Req() req: Request, @Res() res: Response): Promise<any> {
     // const response = await this.jambonzService.registerPhoneNumber({ number: "+16161998349", voip_carrier_sid: "03125a29-8ca2-4d0c-86de-ebc3fe5f57a3" });
-    return true;
+    return res.status(200).json({ msg: "OK" });
   }
 
   @Post()
