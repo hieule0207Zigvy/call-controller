@@ -47,10 +47,10 @@ export class CallControllerController {
         const conversationId = groupCallSettingResponse?.data?.conversationId;
         const groupId = callSettingData.id;
         const {
-          // welcomeMedia,
-          // queueMedia,
-          // timeoutMedia,
-          // voicemailMedia,
+          welcomeMedia,
+          queueMedia,
+          timeoutMedia,
+          voicemailMedia,
           queueTimeout,
           voicemailTimeout,
           fromNumber,
@@ -63,27 +63,11 @@ export class CallControllerController {
           isWelcomeMedia,
           userId,
         } = this.callControllerService.getCallSettings(callSettingData);
-        const welcomeMedia = "https://smartonhold.com.au/wp-content/uploads/2021/11/FEMALE-DEMO-1-Monica-Devine-5-11-21.mp3";
-        const queueMedia = "https://smartonhold.com.au/wp-content/uploads/2021/11/FEMALE-DEMO-2-Inga-Feitsma-5-11-21.mp3";
-        const timeoutMedia = "https://smartonhold.com.au/wp-content/uploads/2023/07/Male-Demo-Rick-Davey.mp3";
-        const voicemailMedia = "https://smartonhold.com.au/wp-content/uploads/2023/04/Male-Demo-1Mark-Fox.mp3";
-        if (isHangup) {
-          if (!!welcomeMedia) {
-            app.play({ url: welcomeMedia });
-          }
-          return res.status(200).json(app);
-        }
-        if (isEnableRecord) {
-          // enable recording.
-          // app.config({
-          //   listen: {
-          //     url: `${process.env.WEBSOCKET_URL}${process.env.WS_RECORD_PATH}`,
-          //     mixType: "stereo",
-          //     enable: true,
-          //   },
-          // });
-          // end record
-        }
+        // const welcomeMedia = "https://smartonhold.com.au/wp-content/uploads/2021/11/FEMALE-DEMO-1-Monica-Devine-5-11-21.mp3";
+        // const queueMedia = "https://smartonhold.com.au/wp-content/uploads/2021/11/FEMALE-DEMO-2-Inga-Feitsma-5-11-21.mp3";
+        // // const queueMedia = "";
+        // const timeoutMedia = "https://smartonhold.com.au/wp-content/uploads/2023/07/Male-Demo-Rick-Davey.mp3";
+        // const voicemailMedia = "https://smartonhold.com.au/wp-content/uploads/2023/04/Male-Demo-1Mark-Fox.mp3";
         if (isForwardCall) {
           app
             .tag({
@@ -95,7 +79,23 @@ export class CallControllerController {
             .play({ url: welcomeMedia, actionHook: "/call-controller/forwarding-hook" });
           return res.status(200).json(app);
         }
-
+        if (isEnableRecord) {
+          // enable recording.
+          app.config({
+            listen: {
+              url: `${process.env.WEBSOCKET_URL}${process.env.WS_RECORD_PATH}`,
+              mixType: "stereo",
+              enable: true,
+            },
+          });
+          // end record
+        }
+        if (isHangup) {
+          if (!!welcomeMedia) {
+            app.play({ url: welcomeMedia });
+          }
+          return res.status(200).json(app);
+        }
         app
           .tag({
             data: {
@@ -107,7 +107,7 @@ export class CallControllerController {
               userId,
             },
           })
-          .play({ url: "", actionHook: "/call-controller/call-hook" })
+          .play({ url: welcomeMedia, actionHook: "/call-controller/call-hook" })
           .conference({
             name: uniqNameConference,
             statusEvents: [ConferenceType.END, ConferenceType.JOIN, ConferenceType.START, ConferenceType.LEAVE],
@@ -176,30 +176,6 @@ export class CallControllerController {
         }
       }
       // for mocking purposes
-      // const { from, to } = req.body;
-      // let toUser: IToUserType = {};
-      // let fromDid = "";
-      // if (from === "test8") fromDid = "16164413854";
-      // if (from === "test8sub") fromDid = "16164399715";
-      // if (isPhoneNumberOrSIP(to) === MemberType.SIP_USER) {
-      //   toUser.type = to.includes(process.env.CHATCHILLA_SIP_DOMAIN) ? MemberType.USER : MemberType.SIP_USER;
-      //   toUser.name = to;
-      // } else {
-      //   if (to === "16164413854") {
-      //     toUser.type = MemberType.USER;
-      //     toUser.name = "test8@voice.chatchilladev.sip.jambonz.cloud";
-      //   } else if (to === "16164399715") {
-      //     toUser.type = MemberType.USER;
-      //     toUser.name = "test8sub@voice.chatchilladev.sip.jambonz.cloud";
-      //   } else {
-      //     toUser.type = MemberType.EXTERNAL_PHONE;
-      //     toUser.number = to.length <= 10 ? `1${to}` : to;
-      //   }
-      // }
-      // if (to === "test8" || to === "test8sub") {
-      //   toUser.type = MemberType.USER;
-      //   toUser.name = `${to}@voice.chatchilladev.sip.jambonz.cloud`;
-      // }
       const app = new WebhookResponse();
       let uniqNameConference = conferencename;
       if (!conferencename) uniqNameConference = getUniqConferenceName();
@@ -500,21 +476,45 @@ export class CallControllerController {
   }
 
   @Post("queue-hook/:conferenceName")
+  // async queueHook(@Req() req: Request, @Res() res: Response): Promise<any> {
+  //   const { conferenceName } = req.params;
+  //   const app = new WebhookResponse();
+  //   const currentCallLog: IConfCall = await this.callControllerService.getCallLogOfCall(conferenceName);
+  //   const url = [currentCallLog.queueMediaUrl, "https://bigsoundbank.com/UPLOAD/mp3/0917.mp3"];
+  //   const option = {
+  //     url,
+  //     timeoutSecs: currentCallLog.queueTimeout,
+  //     actionHook: "/call-controller/timeout-media-hook",
+  //   };
+  //   if (!currentCallLog.queueMediaUrl) {
+  //     option.url = ["https://bigsoundbank.com/UPLOAD/mp3/0917.mp3"];
+  //   }
+  //   const newData = { isTriggerQueueMedia: true };
+  //   app.play(option);
+  //   await this.callControllerService.setCallLogToRedis(conferenceName, newData, currentCallLog);
+  //   res.status(200).json(app);
+  // }
   async queueHook(@Req() req: Request, @Res() res: Response): Promise<any> {
     const { conferenceName } = req.params;
     const app = new WebhookResponse();
     const currentCallLog: IConfCall = await this.callControllerService.getCallLogOfCall(conferenceName);
-    const url = [currentCallLog.queueMediaUrl, "https://bigsoundbank.com/UPLOAD/mp3/0917.mp3"];
+    // const url = [currentCallLog.queueMediaUrl, "https://bigsoundbank.com/UPLOAD/mp3/0917.mp3"];
     const option = {
-      url,
+      url: currentCallLog.queueMediaUrl,
       timeoutSecs: currentCallLog.queueTimeout,
       actionHook: "/call-controller/timeout-media-hook",
     };
     if (!currentCallLog.queueMediaUrl) {
-      option.url = ["https://bigsoundbank.com/UPLOAD/mp3/0917.mp3"];
+      const silentOption = {
+        url: "https://bigsoundbank.com/UPLOAD/mp3/0917.mp3",
+        timeoutSecs: currentCallLog.queueTimeout,
+        actionHook: "/call-controller/timeout-media-hook",
+      };
+      app.play(silentOption);
+    } else {
+      app.play(option);
     }
     const newData = { isTriggerQueueMedia: true };
-    app.play(option);
     await this.callControllerService.setCallLogToRedis(conferenceName, newData, currentCallLog);
     res.status(200).json(app);
   }
@@ -545,6 +545,7 @@ export class CallControllerController {
 
   @Post("rejoin-hook/:conferenceName")
   async reJoinConferenceHook(@Req() req: Request, @Res() res: Response): Promise<any> {
+    console.log("🚀 ~ file: call-controller.controller.ts:548 ~ CallControllerController ~ reJoinConferenceHook ~ reJoinConferenceHook:");
     const { conferenceName } = req.params;
     const app = new WebhookResponse();
     app.conference({
@@ -649,7 +650,7 @@ export class CallControllerController {
   async callStatus(@Req() req: Request, @Res() res: Response): Promise<any> {
     const { conferenceName } = req.params;
     const { call_sid, sip_status, call_status, to } = req.body;
-    console.log("🚀 ~ file: call-controller.controller.ts:575 ~ CallControllerController ~ callStatus ~ req.body:", req.body);
+    // console.log("🚀 ~ file: call-controller.controller.ts:575 ~ CallControllerController ~ callStatus ~ req.body:", req.body);
     const currentCallLog: IConfCall = await this.callControllerService.getCallLogOfCall(conferenceName);
     const { members = [], listPhoneFirstInviteRinging = [] } = currentCallLog;
     const updateMemberList = members;
