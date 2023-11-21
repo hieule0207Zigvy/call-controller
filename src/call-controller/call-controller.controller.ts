@@ -219,7 +219,7 @@ export class CallControllerController {
 
       res.status(200).json(app);
       const log = await this.client.calls.create({
-        from: fromDid,
+        from: fromDid.replace(/[+\s]/g, ""),
         to: toUser,
         call_hook: {
           url: `${process.env.BACKEND_URL}/call-controller/person-join-conference/${uniqNameConference}`,
@@ -290,7 +290,7 @@ export class CallControllerController {
       // } = req.body;
       const { from, to, uniqNameConference, headers = {} } = req.body;
       const log = await this.client.calls.create({
-        from,
+        from: from.replace(/[+\s]/g, ""),
         to,
         call_hook: {
           url: `${process.env.BACKEND_URL}/call-controller/person-join-conference/${uniqNameConference}`,
@@ -492,7 +492,7 @@ export class CallControllerController {
     // Add milliseconds
     const milliseconds = String(currentDate.getUTCMilliseconds()).padStart(3, "0");
     eventTime = eventTime.slice(0, -1) + `.${milliseconds}Z`;
-    await this.callControllerService.updateMemberAndStateOfEndedConference(currentCallLog, { friendly_name: currentCallLog.confUniqueName, time: eventTime });
+    await this.callControllerService.updateMemberAndStateOfEndedConference(currentCallLog, { friendly_name: currentCallLog.confUniqueName, time: eventTime }, true, true);
     res.status(200).json(app);
   }
 
@@ -620,6 +620,7 @@ export class CallControllerController {
       };
       updateMemberList.push(memberData);
       if (!listPhoneFirstInviteRinging.includes(call_sid)) listPhoneFirstInviteRinging.push(call_sid);
+      console.log("🚀 ~ file: call-controller.controller.ts:623 ~ CallControllerController ~ callStatus ~ call_sid:", call_sid);
       await this.callControllerService.setCallLogToRedis(conferenceName, { members: updateMemberList, listPhoneFirstInviteRinging }, currentCallLog);
       const log = { ...currentCallLog, ...{ members: updateMemberList, listPhoneFirstInviteRinging } };
       const response = await axios.post(`${process.env.CHATCHILLA_BACKEND_URL}/voice-log`, { log });
@@ -696,7 +697,7 @@ export class CallControllerController {
           clearTimeout(currentCallLog.fallOverTimeOutSid);
           this.callControllerService.removeAndClearTimeout(currentCallLog.fallOverTimeOutSid);
         }
-        await this.callControllerService.updateMemberAndStateOfEndedConference(currentCallLog, body);
+        await this.callControllerService.updateMemberAndStateOfEndedConference(currentCallLog, body, isEnableQueueMedia, false);
       }
       const log = await this.callControllerService.getCallLogOfCall(friendly_name);
       const response = await axios.post(`${process.env.CHATCHILLA_BACKEND_URL}/voice-log`, { log });

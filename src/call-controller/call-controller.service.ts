@@ -464,16 +464,19 @@ export class CallControllerService {
     }
   };
 
-  updateMemberAndStateOfEndedConference = async (currentCallLog: IConfCall, jambonzLog: any) => {
-    const { friendly_name, time, duration } = jambonzLog;
-    const filterRingingCallSid = currentCallLog.members.filter((member: ILegMember) => member.status === LegMemberStatus.calling).map((member: ILegMember) => member.callId);
-    await this.endAllRingingCall(filterRingingCallSid);
-    const currentMembers = currentCallLog.members;
-    currentMembers.forEach((member: ILegMember) => {
-      member.status = LegMemberStatus.leave;
-      member.eventTime = time;
-    });
-    const newData = { status: ConfCallStatus.END, members: currentMembers, fallOverTimeOutSid: null, currentMemberInConf: 0, eventTime: time, duration };
-    await this.setCallLogToRedis(friendly_name, newData, currentCallLog);
+  updateMemberAndStateOfEndedConference = async (currentCallLog: IConfCall, jambonzLog: any, isEnableQueueMedia: boolean, fromQueueHook: boolean) => {
+    if (!isEnableQueueMedia || (isEnableQueueMedia && fromQueueHook)) {
+      const { friendly_name, time, duration } = jambonzLog;
+      const filterRingingCallSid = currentCallLog.members.filter((member: ILegMember) => member.status === LegMemberStatus.calling).map((member: ILegMember) => member.callId);
+      await this.endAllRingingCall(filterRingingCallSid);
+      const currentMembers = currentCallLog.members;
+      currentMembers.forEach((member: ILegMember) => {
+        member.status = LegMemberStatus.leave;
+        member.eventTime = time;
+      });
+      const newData = { status: ConfCallStatus.END, members: currentMembers, fallOverTimeOutSid: null, currentMemberInConf: 0, eventTime: time, duration };
+      await this.setCallLogToRedis(friendly_name, newData, currentCallLog);
+      console.log("🚀 ~ file: call-controller.service.ts:480 ~ CallControllerService ~ updateMemberAndStateOfEndedConference= ~ newData:", newData)
+    }
   };
 }
