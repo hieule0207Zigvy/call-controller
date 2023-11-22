@@ -477,7 +477,7 @@ export class CallControllerService {
       const newData = { status: ConfCallStatus.END, members: currentMembers, fallOverTimeOutSid: null, currentMemberInConf: 0, eventTime: time, duration };
       await this.setCallLogToRedis(friendly_name, newData, currentCallLog);
       const response = await axios.post(`${process.env.CHATCHILLA_BACKEND_URL}/voice-log`, { ...currentCallLog, ...newData });
-      console.log("🚀 ~ file: call-controller.service.ts:480 ~ CallControllerService ~ updateMemberAndStateOfEndedConference= ~ newData:", newData);
+      console.log("🚀 ~ file: call-controller.service.ts:480 ~ CallControllerService ~ updateMemberAndStateOfEndedConference= ~ response:", response?.status);
       return;
     }
   };
