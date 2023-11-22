@@ -153,13 +153,15 @@ export class JambonzService {
         smpp_inbound_system_id: null,
         smpp_inbound_password: null,
       };
-      const voidTwilioCarrierResponse: any = await axios
-        .post(`${process.env.JAMBONZ_REST_API_BASE_URL}/Accounts/${process.env.JAMBONZ_ACCOUNT_SID}/VoipCarriers`, voidCarrierParams, {
+      const voidTwilioCarrierResponse: any = await axios.post(
+        `${process.env.JAMBONZ_REST_API_BASE_URL}/Accounts/${process.env.JAMBONZ_ACCOUNT_SID}/VoipCarriers`,
+        voidCarrierParams,
+        {
           headers: {
             Authorization: `Bearer ${process.env.JAMBONZ_API_KEY}`,
           },
-        })
-        .catch(err => console.log("🚀 ~ file: call-controller.service.ts:33 ~ CallControllerService ~ callSids.map ~ err:", err));
+        },
+      );
       if (!voidTwilioCarrierResponse && voidTwilioCarrierResponse.status !== 201) return false;
       const newCarrierSid = voidTwilioCarrierResponse.data.sid;
       const sipGateWayList = DefaultSipGateway.map(item => ({ ...item, voip_carrier_sid: newCarrierSid }));
@@ -243,6 +245,23 @@ export class JambonzService {
       }
     } catch (error) {
       console.log("🚀 ~ file: jambonz.service.ts:78 ~ JambonzService ~ createSipAccount= ~ error:", error);
+      return false;
+    }
+  };
+
+  getCarrierName = async (carrierId: string) => {
+    if (!carrierId) return false;
+    try {
+      const carrierResponse = await axios.get(`${process.env.JAMBONZ_REST_API_BASE_URL}/VoipCarriers/${carrierId}`, {
+        headers: {
+          Authorization: `Bearer ${process.env.JAMBONZ_API_KEY}`,
+        },
+      });
+      if (carrierResponse && carrierResponse?.status === 200) {
+        return carrierResponse.data?.name;
+      }
+    } catch (error) {
+      console.log("🚀 ~ file: jambonz.service.ts:257 ~ JambonzService ~ getCarrierName= ~ error:", error);
       return false;
     }
   };
