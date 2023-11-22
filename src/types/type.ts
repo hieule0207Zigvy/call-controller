@@ -5,6 +5,7 @@ export interface IToUserType {
   type?: string;
   number?: string;
   name?: string;
+  trunk?: string;
 }
 export interface IUpdateConferenceOption {
   conf_hold_status?: string;
