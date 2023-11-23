@@ -48,10 +48,10 @@ export class CallControllerController {
         const conversationId = groupCallSettingResponse?.data?.conversationId;
         const groupId = callSettingData.id;
         const {
-          // welcomeMedia,
-          // queueMedia,
-          // timeoutMedia,
-          // voicemailMedia,
+          welcomeMedia,
+          queueMedia,
+          timeoutMedia,
+          voicemailMedia,
           queueTimeout,
           voicemailTimeout,
           fromNumber,
@@ -63,20 +63,28 @@ export class CallControllerController {
           callForwardPhoneNumber,
           isWelcomeMedia,
           userId,
-        } = this.callControllerService.getCallSettings(callSettingData);
-        const welcomeMedia = "https://smartonhold.com.au/wp-content/uploads/2021/11/FEMALE-DEMO-1-Monica-Devine-5-11-21.mp3";
-        const queueMedia = "https://smartonhold.com.au/wp-content/uploads/2021/11/FEMALE-DEMO-2-Inga-Feitsma-5-11-21.mp3";
-        const timeoutMedia = "https://smartonhold.com.au/wp-content/uploads/2023/07/Male-Demo-Rick-Davey.mp3";
-        const voicemailMedia = "https://smartonhold.com.au/wp-content/uploads/2023/04/Male-Demo-1Mark-Fox.mp3";
+          voipCarrier,
+          groupCallSetting,
+        } = await this.callControllerService.getCallSettings(callSettingData);
+        const welcomeSample = "https://smartonhold.com.au/wp-content/uploads/2021/11/FEMALE-DEMO-1-Monica-Devine-5-11-21.mp3";
+        const queueSample = "https://smartonhold.com.au/wp-content/uploads/2021/11/FEMALE-DEMO-2-Inga-Feitsma-5-11-21.mp3";
+        const timeoutSample = "https://smartonhold.com.au/wp-content/uploads/2023/07/Male-Demo-Rick-Davey.mp3";
+        const voicemailSample = "https://smartonhold.com.au/wp-content/uploads/2023/04/Male-Demo-1Mark-Fox.mp3";
+
+        const welcomeSampleMedia = welcomeMedia ? welcomeSample : "";
+        const queueSampleMedia = queueMedia ? queueSample : "";
+        const timeoutSampleMedia = timeoutMedia ? timeoutSample : "";
+        const voicemailSampleMedia = voicemailMedia ? voicemailSample : "";
         if (isForwardCall) {
           app
             .tag({
               data: {
                 to,
                 callForwardPhoneNumber,
+                voipCarrier,
               },
             })
-            .play({ url: welcomeMedia, actionHook: "/call-controller/forwarding-hook" });
+            .play({ url: welcomeSampleMedia, actionHook: "/call-controller/forwarding-hook" });
           return res.status(200).json(app);
         }
         if (isEnableRecord) {
@@ -91,8 +99,8 @@ export class CallControllerController {
           // end record
         }
         if (isHangup) {
-          if (!!welcomeMedia) {
-            app.play({ url: welcomeMedia });
+          if (!!welcomeSampleMedia) {
+            app.play({ url: welcomeSampleMedia });
           }
           return res.status(200).json(app);
         }
@@ -105,9 +113,10 @@ export class CallControllerController {
               conversationId,
               groupId,
               userId,
+              queueTimeout,
             },
           })
-          .play({ url: welcomeMedia, actionHook: "/call-controller/call-hook" })
+          .play({ url: welcomeSampleMedia, actionHook: "/call-controller/call-hook" })
           .conference({
             name: uniqNameConference,
             statusEvents: [ConferenceType.END, ConferenceType.JOIN, ConferenceType.START, ConferenceType.LEAVE],
@@ -131,13 +140,14 @@ export class CallControllerController {
           eventTime: "",
           conversationId,
           isEnableFallOver: isEnableVoiceMail,
-          fallOverMediaUrl: voicemailMedia,
+          fallOverMediaUrl: voicemailSampleMedia,
           fallOverTimeout: voicemailTimeout * 1000,
-          timeoutMediaUrl: timeoutMedia,
-          queueMediaUrl: queueMedia,
+          timeoutMediaUrl: timeoutSampleMedia,
+          queueMediaUrl: queueSampleMedia,
           queueTimeout: queueTimeout,
           isTriggerQueueMedia: false,
           isWelcomeMedia,
+          groupCallSetting,
         };
         await this.callControllerService.setCallLogToRedis(uniqNameConference, initCallLog, null);
       } else res.status(200);
@@ -181,20 +191,21 @@ export class CallControllerController {
       const app = new WebhookResponse();
       let uniqNameConference = conferencename;
       if (!conferencename) uniqNameConference = getUniqConferenceName();
-      // app.config({
-      //   listen: {
-      //     url: `${process.env.WEBSOCKET_URL}${process.env.WS_RECORD_PATH}`,
-      //     mixType: "stereo",
-      //     enable: true,
-      //   },
-      // });
-      app.conference({
-        name: uniqNameConference,
-        statusEvents: [ConferenceType.END, ConferenceType.JOIN, ConferenceType.START, ConferenceType.LEAVE],
-        statusHook: "/call-controller/conference-status",
-        startConferenceOnEnter: true,
-        endConferenceOnExit: true,
-      }); // conference created.
+      app
+        .config({
+          listen: {
+            url: `${process.env.WEBSOCKET_URL}${process.env.WS_RECORD_PATH}`,
+            mixType: "stereo",
+            enable: true,
+          },
+        })
+        .conference({
+          name: uniqNameConference,
+          statusEvents: [ConferenceType.END, ConferenceType.JOIN, ConferenceType.START, ConferenceType.LEAVE],
+          statusHook: "/call-controller/conference-status",
+          startConferenceOnEnter: true,
+          endConferenceOnExit: true,
+        }); // conference created.
 
       const initCallLog: IConfCall = {
         caller: fromDid,
@@ -298,7 +309,7 @@ export class CallControllerController {
       destination.trunk = carrierName;
       const log = await this.client.calls.create({
         from,
-        to:destination,
+        to: destination,
         call_hook: {
           url: `${process.env.BACKEND_URL}/call-controller/person-join-conference/${uniqNameConference}`,
           method: "GET",
@@ -534,7 +545,8 @@ export class CallControllerController {
   async callHook(@Req() req: Request, @Res() res: Response): Promise<any> {
     const { body } = req;
     const { customerData = {} } = body;
-    const { listMember = [], uniqNameConference, from, conversationId, groupId, userId } = customerData;
+    const { listMember = [], uniqNameConference, from, conversationId, groupId, userId, queueTimeout } = customerData;
+    console.log("🚀 ~ file: call-controller.controller.ts:546 ~ CallControllerController ~ callHook ~ listMember:", listMember);
     // const members = [];
     const callList = _.uniqBy(listMember, "name");
     Promise.all(
@@ -560,7 +572,7 @@ export class CallControllerController {
           speech_synthesis_voice: "en-US-Standard-C",
           speech_recognizer_vendor: "google",
           speech_recognizer_language: "en-US",
-          timeout: 60,
+          timeout: queueTimeout ? queueTimeout : 60,
           headers: {
             conversationId,
             conferenceName: uniqNameConference,
@@ -582,8 +594,10 @@ export class CallControllerController {
   async forwardingHook(@Req() req: Request, @Res() res: Response): Promise<any> {
     const { body } = req;
     const { customerData = {} } = body;
-    const { to, callForwardPhoneNumber } = customerData;
+    const { to, callForwardPhoneNumber, voipCarrier } = customerData;
     // const { outDialNumber = "17147520454", callerId = "+16164413854" } = req.body;
+    const carrierName = await this.jambonzService.getCarrierName(voipCarrier);
+    console.log("🚀 ~ file: call-controller.controller.ts:596 ~ CallControllerController ~ forwardingHook ~ carrierName:", carrierName);
     const app = new WebhookResponse();
     app.dial({
       callerId: to,
@@ -592,6 +606,7 @@ export class CallControllerController {
         {
           type: "phone",
           number: callForwardPhoneNumber.replace(/[+\s]/g, ""),
+          trunk: carrierName,
         },
       ],
     });
@@ -670,9 +685,17 @@ export class CallControllerController {
       const { conference_sid, event, members, friendly_name, call_sid, to, time, direction, duration } = body;
       if (!event) return res.sendStatus(200);
       const currentCallLog: IConfCall = await this.callControllerService.getCallLogOfCall(friendly_name);
+      const groupCallSetting = currentCallLog?.groupCallSetting;
+      const callSettingDidNotHaveQueueMedia =
+        groupCallSetting === GroupCallSettingRingingType.OTHER_GROUP ||
+        groupCallSetting === GroupCallSettingRingingType.EXTERNAL_NUMBER ||
+        groupCallSetting === GroupCallSettingRingingType.HANG_UP ||
+        groupCallSetting === GroupCallSettingRingingType.A_ROLE_IN_GROUP ||
+        groupCallSetting === GroupCallSettingRingingType.CALL_FORWARDING;
+
       console.log("🚀 ~ file: call-controller.controller.ts:258 ~ CallControllerController ~ conferenceStatus:", body);
       const listPhoneFirstInviteRinging = currentCallLog?.listPhoneFirstInviteRinging || [];
-      const isEnableQueueMedia = !!currentCallLog?.queueTimeout && currentCallLog?.isWelcomeMedia;
+      const isEnableQueueMedia = !!currentCallLog?.queueTimeout && currentCallLog?.isWelcomeMedia && !callSettingDidNotHaveQueueMedia;
       const isTriggerQueueMedia = currentCallLog?.isTriggerQueueMedia;
       const isEnableFallOver = currentCallLog?.isEnableFallOver;
       const isOutboundCall = currentCallLog?.isOutboundCall;
