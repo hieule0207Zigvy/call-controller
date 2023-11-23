@@ -8,10 +8,11 @@ var _ = require("lodash");
 import { Cache } from "cache-manager";
 import { Timer } from "./../utils/Timer";
 import { getNameOfEmail, isPhoneNumberOrSIP } from "src/utils/until";
+import { JambonzService } from "src/jambonz/jambonz.service";
 
 @Injectable()
 export class CallControllerService {
-  constructor(@Inject(CACHE_MANAGER) private cacheManager: Cache) {}
+  constructor(@Inject(CACHE_MANAGER) private cacheManager: Cache, private jambonzService: JambonzService) {}
   private client: any = jambonz(process.env.JAMBONZ_ACCOUNT_SID, process.env.JAMBONZ_API_KEY, {
     baseUrl: process.env.JAMBONZ_REST_API_BASE_URL,
   });
@@ -91,7 +92,7 @@ export class CallControllerService {
     return result;
   };
 
-  getCallSettings = (callSettingData: any) => {
+  getCallSettings = async (callSettingData: any) => {
     const memberNeedToCall = [];
     let welcomeMedia = "";
     let queueMedia = "";
@@ -105,6 +106,7 @@ export class CallControllerService {
     let isForwardCall = false;
     let callForwardPhoneNumber = "";
     let welcomeMediaUrl = false;
+   
     const userId = [];
     try {
       const {
@@ -120,9 +122,11 @@ export class CallControllerService {
         owner,
         call_setting_auto_record,
       } = callSettingData;
-
+      const voipCarrier = owner?.voip_carrier;
+      const carrierName = await this.jambonzService.getCarrierName(voipCarrier);
       const { members = [] } = group;
       const memberInOtherGroup = other_group?.members;
+      const groupCallSetting = type
 
       switch (type) {
         case GroupCallSettingRingingType.HANG_UP: {
@@ -136,7 +140,6 @@ export class CallControllerService {
         }
         case GroupCallSettingRingingType.CALL_FORWARDING: {
           //pass
-
           fromNumber = external_number.ani;
           callForwardPhoneNumber = call_setting_forward_phone;
           if (call_setting_welcome_media) {
@@ -147,15 +150,10 @@ export class CallControllerService {
         }
         case GroupCallSettingRingingType.EXTERNAL_NUMBER: {
           // pass
-
-          const external_number = {
-            phone_number: "+17147520454",
-            ani: "+16164413854",
-            gateway: ["twillio-gw", "Ytel", "Questblue"],
-          };
           memberNeedToCall.push({
             type: MemberType.EXTERNAL_PHONE,
             number: external_number.phone_number.replace(/[\s+]/g, ""),
+            trunk: carrierName,
           });
           fromNumber = external_number.ani.replace(/[\s+]/g, "");
           if (call_setting_welcome_media) {
@@ -171,7 +169,7 @@ export class CallControllerService {
               const { email } = member;
               const sipName = getNameOfEmail(email);
               if (!!sipName) {
-                memberNeedToCall.push({ type: MemberType.USER, name: `${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}` });
+                memberNeedToCall.push({ type: MemberType.USER, name: `${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}`, trunk: carrierName });
                 const user = {};
                 user[`${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}`] = member.id;
                 userId.push(user);
@@ -197,7 +195,7 @@ export class CallControllerService {
               const { email } = member;
               const sipName = getNameOfEmail(email);
               if (!!sipName) {
-                memberNeedToCall.push({ type: MemberType.USER, name: `${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}` });
+                memberNeedToCall.push({ type: MemberType.USER, name: `${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}`, trunk: carrierName });
                 const user = {};
                 user[`${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}`] = member.id;
                 userId.push(user);
@@ -215,7 +213,7 @@ export class CallControllerService {
             const { email } = member;
             const sipName = getNameOfEmail(email);
             if (!!sipName) {
-              memberNeedToCall.push({ type: MemberType.USER, name: `${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}` });
+              memberNeedToCall.push({ type: MemberType.USER, name: `${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}`, trunk: carrierName });
               const user = {};
               user[`${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}`] = member.id;
               userId.push(user);
@@ -238,7 +236,7 @@ export class CallControllerService {
             const { email } = member;
             const sipName = getNameOfEmail(email);
             if (!!sipName) {
-              memberNeedToCall.push({ type: MemberType.USER, name: `${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}` });
+              memberNeedToCall.push({ type: MemberType.USER, name: `${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}`, trunk: carrierName });
               const user = {};
               user[`${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}`] = member.id;
               userId.push(user);
@@ -257,7 +255,7 @@ export class CallControllerService {
               const { email } = member;
               const sipName = getNameOfEmail(email);
               if (!!sipName) {
-                memberNeedToCall.push({ type: MemberType.USER, name: `${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}` });
+                memberNeedToCall.push({ type: MemberType.USER, name: `${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}`, trunk: carrierName });
                 const user = {};
                 user[`${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}`] = member.id;
                 userId.push(user);
@@ -280,7 +278,7 @@ export class CallControllerService {
             const { email } = owner;
             const sipName = getNameOfEmail(email);
             if (!!sipName) {
-              memberNeedToCall.push({ type: MemberType.USER, name: `${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}` });
+              memberNeedToCall.push({ type: MemberType.USER, name: `${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}`, trunk: carrierName });
               const user = {};
               user[`${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}`] = owner.id;
               userId.push(user);
@@ -290,7 +288,7 @@ export class CallControllerService {
               const { email } = member;
               const sipName = getNameOfEmail(email);
               if (!!sipName) {
-                memberNeedToCall.push({ type: MemberType.USER, name: `${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}` });
+                memberNeedToCall.push({ type: MemberType.USER, name: `${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}`, trunk: carrierName });
                 const user = {};
                 user[`${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}`] = member.id;
                 userId.push(user);
@@ -328,6 +326,8 @@ export class CallControllerService {
         isForwardCall,
         callForwardPhoneNumber,
         isWelcomeMedia: !!call_setting_welcome_media,
+        voipCarrier,
+        groupCallSetting
       };
     } catch (error) {
       console.log("🚀 ~ file: call-controller.service.ts:271 ~ error:", error);

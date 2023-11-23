@@ -46,6 +46,7 @@ export interface IConfCall {
   isMute?: boolean;
   isCallerLeft?: boolean;
   duration?: string;
+  groupCallSetting?: string;
 }
 
 export interface ITypeOfToUser {
