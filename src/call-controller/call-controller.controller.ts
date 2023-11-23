@@ -107,7 +107,7 @@ export class CallControllerController {
               userId,
             },
           })
-          .play({ url: "", actionHook: "/call-controller/call-hook" })
+          .play({ url: welcomeMedia, actionHook: "/call-controller/call-hook" })
           .conference({
             name: uniqNameConference,
             statusEvents: [ConferenceType.END, ConferenceType.JOIN, ConferenceType.START, ConferenceType.LEAVE],
