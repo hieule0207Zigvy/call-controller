@@ -191,15 +191,15 @@ export class CallControllerController {
       const app = new WebhookResponse();
       let uniqNameConference = conferencename;
       if (!conferencename) uniqNameConference = getUniqConferenceName();
-      app
-        .config({
-          listen: {
-            url: `${process.env.WEBSOCKET_URL}${process.env.WS_RECORD_PATH}`,
-            mixType: "stereo",
-            enable: true,
-          },
-        })
-        .conference({
+      // app
+      //   .config({
+      //     listen: {
+      //       url: `${process.env.WEBSOCKET_URL}${process.env.WS_RECORD_PATH}`,
+      //       mixType: "stereo",
+      //       enable: true,
+      //     },
+      //   })
+        app.conference({
           name: uniqNameConference,
           statusEvents: [ConferenceType.END, ConferenceType.JOIN, ConferenceType.START, ConferenceType.LEAVE],
           statusHook: "/call-controller/conference-status",
