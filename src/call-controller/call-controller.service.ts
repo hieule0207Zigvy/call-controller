@@ -52,7 +52,7 @@ export class CallControllerService {
                   console.log("🚀 ~ file: call-controller.service.ts:50 ~ CallControllerService ~ callSids.map ~ error?.status:", error?.response?.status);
                   isSuccess = false;
                 }
-                console.log("🚀 ~ file: call-controller.service.ts:48 ~ CallControllerService ~ callSids.map ~ error:", error);
+                console.log("🚀 ~ file: call-controller.service.ts:48 ~ CallControllerService ~ callSids.map ~ error:", error?.response?.status);
                 isSuccess = false;
               }
             }
@@ -106,7 +106,7 @@ export class CallControllerService {
     let isForwardCall = false;
     let callForwardPhoneNumber = "";
     let welcomeMediaUrl = false;
-   
+
     const userId = [];
     try {
       const {
@@ -126,7 +126,7 @@ export class CallControllerService {
       const carrierName = await this.jambonzService.getCarrierName(voipCarrier);
       const { members = [] } = group;
       const memberInOtherGroup = other_group?.members;
-      const groupCallSetting = type
+      const groupCallSetting = type;
 
       switch (type) {
         case GroupCallSettingRingingType.HANG_UP: {
@@ -327,7 +327,7 @@ export class CallControllerService {
         callForwardPhoneNumber,
         isWelcomeMedia: !!call_setting_welcome_media,
         voipCarrier,
-        groupCallSetting
+        groupCallSetting,
       };
     } catch (error) {
       console.log("🚀 ~ file: call-controller.service.ts:271 ~ error:", error);
@@ -382,12 +382,14 @@ export class CallControllerService {
     newMembers.forEach((m: ILegMember) => {
       if (call_sid === m.callId) {
         m.status = LegMemberStatus[event];
+        m.statusList = [...m.statusList, LegMemberStatus[event]];
         m.eventTime = time;
       }
     });
     const newData = { members: newMembers, currentMemberInConf: members, masterCallId: currentCallLog?.masterCallId };
     if (!currentCallLog?.masterCallId) newData.masterCallId = call_sid;
     await this.setCallLogToRedis(friendly_name, newData, currentCallLog);
+    return
   };
 
   triggerFallOverTimeoutWithoutQueueMedia = async (currentCallLog: IConfCall, jambonzLog: any) => {
@@ -424,9 +426,11 @@ export class CallControllerService {
         status: LegMemberStatus.join,
         value: to,
         eventTime: time,
+        statusList: [LegMemberStatus.calling, LegMemberStatus.join],
       });
       const newData = { members: currentMembers, currentMemberInConf: members };
       await this.setCallLogToRedis(friendly_name, newData, currentCallLog);
+      return;
     }
   };
 
@@ -449,6 +453,7 @@ export class CallControllerService {
           if (filterAcceptCallSid.includes(member.callId)) {
             if (member.status !== LegMemberStatus.no_answer && member.status !== LegMemberStatus.not_available) {
               member.status = LegMemberStatus.leave;
+              member.statusList = [...member.statusList, LegMemberStatus.leave];
               member.eventTime = time;
             }
           }
@@ -458,6 +463,7 @@ export class CallControllerService {
       } else {
         const newData = { fallOverTimeOutSid: null, currentMemberInConf: members };
         await this.setCallLogToRedis(friendly_name, newData, currentCallLog);
+        return;
       }
     } catch (error) {
       console.log("🚀 ~ file: call-controller.service.ts:381 ~ CallControllerService ~ endCallOfFirstInviteMemberAndUpdateListMember= ~ error:", error);
@@ -472,12 +478,12 @@ export class CallControllerService {
       const currentMembers = currentCallLog.members;
       currentMembers.forEach((member: ILegMember) => {
         member.status = LegMemberStatus.leave;
+        member.statusList = [...member.statusList, LegMemberStatus.leave];
         member.eventTime = time;
       });
       const newData = { status: ConfCallStatus.END, members: currentMembers, fallOverTimeOutSid: null, currentMemberInConf: 0, eventTime: time, duration };
       await this.setCallLogToRedis(friendly_name, newData, currentCallLog);
-      const response = await axios.post(`${process.env.CHATCHILLA_BACKEND_URL}/voice-log`, { log: { ...currentCallLog, ...newData } });
-      console.log("🚀 ~ file: call-controller.service.ts:480 ~ CallControllerService ~ updateMemberAndStateOfEndedConference= ~ response:", response?.status);
+      await axios.post(`${process.env.CHATCHILLA_BACKEND_URL}/voice-log`, { log: { ...currentCallLog, ...newData } });
       return;
     }
   };
