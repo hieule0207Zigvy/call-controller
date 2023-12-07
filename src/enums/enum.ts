@@ -52,6 +52,7 @@ export enum CallStatus {
   trying = "trying",
   early_media = "early-media",
   in_progress = "in-progress",
+  completed = "completed",
 }
 
 export enum SampleMedia {

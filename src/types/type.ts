@@ -1,5 +1,4 @@
-import { MemberType } from "aws-sdk/clients/workmail";
-import { LegMemberStatus, ConfCallStatus } from "src/enums/enum";
+import { LegMemberStatus, ConfCallStatus, MemberType } from "src/enums/enum";
 
 export interface IToUserType {
   type?: string;
@@ -15,11 +14,12 @@ export interface IUpdateConferenceOption {
 
 export interface ILegMember {
   callId: string;
-  type: MemberType;
+  type: string;
   value: string;
   status: LegMemberStatus;
   eventTime?: Date;
   isMute?: boolean;
+  statusList: string[];
 }
 
 export interface IConfCall {
