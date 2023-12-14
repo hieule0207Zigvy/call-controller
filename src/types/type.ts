@@ -47,6 +47,10 @@ export interface IConfCall {
   isCallerLeft?: boolean;
   duration?: string;
   groupCallSetting?: string;
+  ivrTimeoutData?: any;
+  ivrTimeoutSid?: any;
+  groupId?: string;
+  callerNumber?: string;
 }
 
 export interface ITypeOfToUser {
@@ -54,4 +58,9 @@ export interface ITypeOfToUser {
   name?: string;
   sipUri?: string;
   number?: string;
+}
+
+export interface IIvrType {
+  welcomeMedia: string;
+  ivrFallOverTimeout?: string;
 }

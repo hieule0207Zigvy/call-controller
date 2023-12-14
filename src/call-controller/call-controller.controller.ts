@@ -66,7 +66,32 @@ export class CallControllerController {
           userId,
           voipCarrier,
           groupCallSetting,
-        } = await this.callControllerService.getCallSettings(callSettingData);
+          isIVR,
+          ivrData,
+        } = await this.callControllerService.getCallSettings(callSettingData, to);
+        if (isIVR) {
+          app
+            .tag({
+              data: {
+                ivrData,
+                uniqNameConference,
+                from: fromNumber ? fromNumber : from,
+                conversationId,
+                groupId,
+                userId,
+                groupCallSetting,
+              },
+            })
+            // .play({ url: 'https://smartonhold.com.au/wp-content/uploads/2021/11/FEMALE-DEMO-1-Monica-Devine-5-11-21.mp3' })
+            .gather({
+              actionHook: "/call-controller/gather-dtmf-hook",
+              input: ["digits"],
+              dtmfBargein: true,
+              listenDuringPrompt: true,
+              numDigits: 1,
+            });
+          return res.status(200).json(app);
+        }
         const welcomeSample = "https://smartonhold.com.au/wp-content/uploads/2021/11/FEMALE-DEMO-1-Monica-Devine-5-11-21.mp3";
         const queueSample = "https://smartonhold.com.au/wp-content/uploads/2021/11/FEMALE-DEMO-2-Inga-Feitsma-5-11-21.mp3";
         const timeoutSample = "https://smartonhold.com.au/wp-content/uploads/2023/07/Male-Demo-Rick-Davey.mp3";
@@ -80,7 +105,7 @@ export class CallControllerController {
           app
             .tag({
               data: {
-                to,
+                to: fromNumber,
                 callForwardPhoneNumber,
                 voipCarrier,
               },
@@ -427,6 +452,356 @@ export class CallControllerController {
     }
   }
   // hook
+  @Post("gather-dtmf-hook")
+  async gatherDtmfHook(@Req() req: Request, @Res() res: Response): Promise<any> {
+    const app = new WebhookResponse();
+    const { body } = req;
+    const { customerData, digits, call_sid } = body;
+    const { timeoutData, failoverData, actionData, listenDtmf, timeout = 45 } = customerData.ivrData;
+    console.log("🚀 ~ file: call-controller.controller.ts:461 ~ CallControllerController ~ gatherDtmfHook ~ timeoutData:", timeoutData);
+    console.log("🚀 ~ file: call-controller.controller.ts:461 ~ CallControllerController ~ gatherDtmfHook ~ failoverData:", failoverData);
+    const { uniqNameConference, from, conversationId, groupId, userId, groupCallSetting } = customerData;
+    const allDtmf = listenDtmf.map(item => item.toString());
+    const isDtmfInListenList = allDtmf.includes(digits);
+    console.log("🚀 ~ file: call-controller.controller.ts:465 ~ CallControllerController ~ gatherDtmfHook ~ isDtmfInListenList:", isDtmfInListenList);
+    if (!isDtmfInListenList) {
+      const { failoverMedia } = failoverData;
+      app
+        .tag({ data: { failoverData, confUniqueName: uniqNameConference, conversationId, groupId, callerNumber: from } })
+        .play({
+          url: "https://smartonhold.com.au/wp-content/uploads/2021/11/FEMALE-DEMO-1-Monica-Devine-5-11-21.mp3",
+          actionHook: "/call-controller/ivr-failover-call-hook",
+        })
+        .conference({
+          name: uniqNameConference,
+          statusEvents: [ConferenceType.END, ConferenceType.JOIN, ConferenceType.START, ConferenceType.LEAVE],
+          statusHook: "/call-controller/conference-status-ivr",
+          startConferenceOnEnter: true,
+          endConferenceOnExit: true,
+        });
+      const initCallLog: IConfCall = {
+        caller: from,
+        isOneOfMemberAnswer: false,
+        confUniqueName: uniqNameConference,
+        masterCallId: "",
+        status: ConfCallStatus.CREATED,
+        members: [],
+        currentMemberInConf: 0,
+        fallOverTimeOutSid: "",
+        isOutboundCall: false,
+        listPhoneFirstInviteRinging: [],
+        eventTime: "",
+        conversationId,
+        isEnableFallOver: false,
+        fallOverMediaUrl: "",
+        fallOverTimeout: 0,
+        timeoutMediaUrl: "",
+        queueMediaUrl: "",
+        queueTimeout: 0,
+        isTriggerQueueMedia: false,
+        isWelcomeMedia: false,
+        groupCallSetting,
+        ivrTimeoutData: timeoutData,
+        groupId,
+        callerNumber: from,
+      };
+      await this.callControllerService.setCallLogToRedis(uniqNameConference, initCallLog, null);
+      return res.status(200).json(app);
+    }
+    const dtmfToIvr = actionData[digits];
+    console.log("🚀 ~ file: call-controller.controller.ts:512 ~ CallControllerController ~ gatherDtmfHook ~ dtmfToIvr:", dtmfToIvr.userId);
+    if (dtmfToIvr.isHangup) {
+      app.play({ url: "https://smartonhold.com.au/wp-content/uploads/2021/11/FEMALE-DEMO-1-Monica-Devine-5-11-21.mp3" });
+      return res.status(200).json(app);
+    }
+    if (dtmfToIvr.isForward) {
+      app.tag({ data: dtmfToIvr }).play({
+        url: "https://smartonhold.com.au/wp-content/uploads/2021/11/FEMALE-DEMO-1-Monica-Devine-5-11-21.mp3",
+        actionHook: "/call-controller/dtmf-forward-call-hook",
+      });
+      return res.status(200).json(app);
+    }
+    app
+      .tag({ data: { dtmfToIvr, from, conversationId, groupId, userId, uniqNameConference } })
+      .play({ url: "https://smartonhold.com.au/wp-content/uploads/2021/11/FEMALE-DEMO-1-Monica-Devine-5-11-21.mp3", actionHook: "/call-controller/dtmf-invite-call-hook" })
+      .conference({
+        name: uniqNameConference,
+        statusEvents: [ConferenceType.END, ConferenceType.JOIN, ConferenceType.START, ConferenceType.LEAVE],
+        statusHook: "/call-controller/conference-status-ivr",
+        startConferenceOnEnter: true,
+        endConferenceOnExit: true,
+      });
+    const initCallLog: IConfCall = {
+      caller: from,
+      isOneOfMemberAnswer: false,
+      confUniqueName: uniqNameConference,
+      masterCallId: "",
+      status: ConfCallStatus.CREATED,
+      members: [],
+      currentMemberInConf: 0,
+      fallOverTimeOutSid: "",
+      isOutboundCall: false,
+      listPhoneFirstInviteRinging: [],
+      eventTime: "",
+      conversationId,
+      isEnableFallOver: false,
+      fallOverMediaUrl: "",
+      fallOverTimeout: 0,
+      timeoutMediaUrl: "",
+      queueMediaUrl: "",
+      queueTimeout: 0,
+      isTriggerQueueMedia: false,
+      isWelcomeMedia: false,
+      groupCallSetting,
+      ivrTimeoutData: timeoutData,
+      groupId,
+      callerNumber: from,
+    };
+    await this.callControllerService.setCallLogToRedis(uniqNameConference, initCallLog, null);
+
+    return res.status(200).json(app);
+  }
+
+  @Post("dtmf-forward-call-hook")
+  async dtmfForwardCallHook(@Req() req: Request, @Res() res: Response): Promise<any> {
+    const { customerData, digits, call_sid } = req.body;
+    const { fromNumber, memberNeedToCall } = customerData;
+    const app = new WebhookResponse();
+    app.dial({
+      callerId: fromNumber,
+      answerOnBridge: true,
+      target: [
+        {
+          type: MemberType.EXTERNAL_PHONE,
+          number: memberNeedToCall[0]?.number.replace(/[^0-9+]/g, ""),
+          trunk: memberNeedToCall[0]?.trunk,
+        },
+      ],
+    });
+    return res.status(200).json(app);
+  }
+
+  @Post("dtmf-invite-call-hook")
+  async dtmfInviteCallHook(@Req() req: Request, @Res() res: Response): Promise<any> {
+    const { customerData } = req.body;
+    const { dtmfToIvr, from, conversationId, groupId, userId, uniqNameConference } = customerData;
+    const callList = _.uniqBy(dtmfToIvr.memberNeedToCall, "name");
+    Promise.all(
+      callList.map(async (member: ITypeOfToUser) => {
+        const userIdList = [];
+        dtmfToIvr?.userId.forEach(user => {
+          const id = user[member.name];
+          if (id) userIdList.push(id);
+        });
+        const callRingingSid = await this.client.calls.create({
+          from,
+          to: member,
+          call_hook: {
+            url: `${process.env.BACKEND_URL}/call-controller/ivr-person-join-conference/${uniqNameConference}`,
+            method: "GET",
+          },
+          call_status_hook: {
+            url: `${process.env.BACKEND_URL}/call-controller/call-status/${uniqNameConference}`,
+            method: "POST",
+          },
+          speech_synthesis_vendor: "google",
+          speech_synthesis_language: "en-US",
+          speech_synthesis_voice: "en-US-Standard-C",
+          speech_recognizer_vendor: "google",
+          speech_recognizer_language: "en-US",
+          timeout: 45,
+          headers: {
+            conversationId,
+            conferenceName: uniqNameConference,
+            groupId,
+            isRequestJoinCall: false,
+            parentSessionId: "",
+            userId: userIdList,
+          },
+        });
+      }),
+    ).catch(err => {
+      console.log("🚀 ~ file: call-controller.controller.ts:534 ~ CallControllerController ~ callHook ~ err:", err);
+      res.sendStatus(503);
+    });
+    res.sendStatus(200);
+  }
+
+  @Post("conference-timeout-ivr-hook/:conferenceName")
+  async conferenceTimeoutIvr(@Req() req: Request, @Res() res: Response): Promise<any> {
+    const { conferenceName } = req.params;
+    const currentCallLog: IConfCall = await this.callControllerService.getCallLogOfCall(conferenceName);
+    if (currentCallLog.isOneOfMemberAnswer) {
+      return res.sendStatus(200);
+    }
+    const app = new WebhookResponse();
+    const { ivrTimeoutData, confUniqueName, conversationId, callerNumber, groupId } = currentCallLog;
+    // const option = {
+    //   url: ivrTimeoutData.timeoutMedia,
+    // };
+    const option = {
+      url: "https://smartonhold.com.au/wp-content/uploads/2023/07/Male-Demo-Rick-Davey.mp3",
+      actionHook: "/call-controller/ivr-timeout-call-hook",
+    };
+    app
+      .tag({ data: { ivrTimeoutData, confUniqueName, conversationId, callerNumber, groupId } })
+      .play(option)
+      .conference({
+        name: confUniqueName,
+        statusEvents: [ConferenceType.END, ConferenceType.JOIN, ConferenceType.START, ConferenceType.LEAVE],
+        statusHook: "/call-controller/conference-status-ivr",
+        startConferenceOnEnter: true,
+        endConferenceOnExit: true,
+      });
+    res.status(200).json(app);
+  }
+
+  @Post("ivr-timeout-call-hook")
+  async ivrTimeoutCallHook(@Req() req: Request, @Res() res: Response): Promise<any> {
+    const { customerData } = req.body;
+    const { ivrTimeoutData, confUniqueName, conversationId, groupId, callerNumber } = customerData;
+    if (ivrTimeoutData.timeoutMemberNeedToCall[0]?.type === MemberType.EXTERNAL_PHONE) {
+      const app = new WebhookResponse();
+      app.dial({
+        callerId: ivrTimeoutData.fromNumber,
+        answerOnBridge: true,
+        target: [
+          {
+            type: MemberType.EXTERNAL_PHONE,
+            number: ivrTimeoutData.timeoutMemberNeedToCall[0]?.number.replace(/[^0-9+]/g, ""),
+            trunk: ivrTimeoutData.timeoutMemberNeedToCall[0]?.trunk,
+          },
+        ],
+      });
+      return res.status(200).json(app);
+    }
+    const callList = _.uniqBy(ivrTimeoutData.timeoutMemberNeedToCall, "name");
+    Promise.all(
+      callList.map(async (member: ITypeOfToUser) => {
+        const userIdList = [];
+        ivrTimeoutData?.timeoutUserId.forEach(user => {
+          const id = user[member.name];
+          if (id) userIdList.push(id);
+        });
+        const callRingingSid = await this.client.calls.create({
+          from: callerNumber,
+          to: member,
+          call_hook: {
+            url: `${process.env.BACKEND_URL}/call-controller/ivr-person-join-conference/${confUniqueName}`,
+            method: "GET",
+          },
+          call_status_hook: {
+            url: `${process.env.BACKEND_URL}/call-controller/call-status/${confUniqueName}`,
+            method: "POST",
+          },
+          speech_synthesis_vendor: "google",
+          speech_synthesis_language: "en-US",
+          speech_synthesis_voice: "en-US-Standard-C",
+          speech_recognizer_vendor: "google",
+          speech_recognizer_language: "en-US",
+          timeout: 45,
+          headers: {
+            conversationId,
+            conferenceName: confUniqueName,
+            groupId,
+            isRequestJoinCall: false,
+            parentSessionId: "",
+            userId: userIdList,
+          },
+        });
+        console.log("🚀 ~ file: call-controller.controller.ts:590 ~ CallControllerController ~ callList.map ~ callRingingSid:", callRingingSid);
+      }),
+    ).catch(err => {
+      console.log("🚀 ~ file: call-controller.controller.ts:534 ~ CallControllerController ~ callHook ~ err:", err);
+      res.sendStatus(503);
+    });
+    res.sendStatus(200);
+  }
+
+  @Post("ivr-failover-call-hook")
+  async ivrFailoverCallHook(@Req() req: Request, @Res() res: Response): Promise<any> {
+    const { customerData } = req.body;
+    const { failoverData, confUniqueName, conversationId, groupId, callerNumber } = customerData;
+    console.log("🚀 ~ file: call-controller.controller.ts:739 ~ CallControllerController ~ ivrTimeoutCallHook ~ customerData:", confUniqueName);
+    if (failoverData.failoverMemberNeedToCall[0]?.type === MemberType.EXTERNAL_PHONE) {
+      const app = new WebhookResponse();
+      app.dial({
+        callerId: failoverData.fromNumber,
+        answerOnBridge: true,
+        target: [
+          {
+            type: MemberType.EXTERNAL_PHONE,
+            number: failoverData.failoverMemberNeedToCall[0]?.number.replace(/[^0-9+]/g, ""),
+            trunk: failoverData.failoverMemberNeedToCall[0]?.trunk,
+          },
+        ],
+      });
+      return res.status(200).json(app);
+    }
+    const callList = _.uniqBy(failoverData.failoverMemberNeedToCall, "name");
+    Promise.all(
+      callList.map(async (member: ITypeOfToUser) => {
+        const userIdList = [];
+        failoverData?.failoverUserId.forEach(user => {
+          const id = user[member.name];
+          if (id) userIdList.push(id);
+        });
+        const callRingingSid = await this.client.calls.create({
+          from: callerNumber,
+          to: member,
+          call_hook: {
+            url: `${process.env.BACKEND_URL}/call-controller/ivr-person-join-conference/${confUniqueName}`,
+            method: "GET",
+          },
+          call_status_hook: {
+            url: `${process.env.BACKEND_URL}/call-controller/call-status/${confUniqueName}`,
+            method: "POST",
+          },
+          speech_synthesis_vendor: "google",
+          speech_synthesis_language: "en-US",
+          speech_synthesis_voice: "en-US-Standard-C",
+          speech_recognizer_vendor: "google",
+          speech_recognizer_language: "en-US",
+          timeout: 45,
+          headers: {
+            conversationId,
+            conferenceName: confUniqueName,
+            groupId,
+            isRequestJoinCall: false,
+            parentSessionId: "",
+            userId: userIdList,
+          },
+        });
+        console.log("🚀 ~ file: call-controller.controller.ts:590 ~ CallControllerController ~ callList.map ~ callRingingSid:", callRingingSid);
+      }),
+    ).catch(err => {
+      console.log("🚀 ~ file: call-controller.controller.ts:534 ~ CallControllerController ~ callHook ~ err:", err);
+      res.sendStatus(503);
+    });
+    res.sendStatus(200);
+  }
+
+  @Get("ivr-person-join-conference/:conferenceName")
+  async ivrPersonJoinConference(@Req() req: Request, @Res() res: Response): Promise<any> {
+    try {
+      const { conferenceName } = req.params;
+      const app = new WebhookResponse();
+      // create unique name for conference
+      app.conference({
+        name: conferenceName,
+        statusEvents: [ConferenceType.END, ConferenceType.JOIN, ConferenceType.START, ConferenceType.LEAVE],
+        statusHook: "/call-controller/conference-status-ivr",
+      });
+      const newData = { isOneOfMemberAnswer: true, status: ConfCallStatus.START };
+      const currentCallLog: IConfCall = await this.callControllerService.getCallLogOfCall(conferenceName);
+      await this.callControllerService.setCallLogToRedis(conferenceName, newData, currentCallLog);
+      return res.status(200).json(app);
+    } catch (err) {
+      console.log("🚀 ~ file: call-controller.controller.ts:397 ~ CallControllerController ~ personJoinConference ~ err:", err);
+      res.sendStatus(503);
+    }
+  }
+
   @Get("person-join-conference/:conferenceName")
   async personJoinConference(@Req() req: Request, @Res() res: Response): Promise<any> {
     try {
@@ -449,24 +824,6 @@ export class CallControllerController {
   }
 
   @Post("queue-hook/:conferenceName")
-  // async queueHook(@Req() req: Request, @Res() res: Response): Promise<any> {
-  //   const { conferenceName } = req.params;
-  //   const app = new WebhookResponse();
-  //   const currentCallLog: IConfCall = await this.callControllerService.getCallLogOfCall(conferenceName);
-  //   const url = [currentCallLog.queueMediaUrl, "https://bigsoundbank.com/UPLOAD/mp3/0917.mp3"];
-  //   const option = {
-  //     url,
-  //     timeoutSecs: currentCallLog.queueTimeout,
-  //     actionHook: "/call-controller/timeout-media-hook",
-  //   };
-  //   if (!currentCallLog.queueMediaUrl) {
-  //     option.url = ["https://bigsoundbank.com/UPLOAD/mp3/0917.mp3"];
-  //   }
-  //   const newData = { isTriggerQueueMedia: true };
-  //   app.play(option);
-  //   await this.callControllerService.setCallLogToRedis(conferenceName, newData, currentCallLog);
-  //   res.status(200).json(app);
-  // }
   async queueHook(@Req() req: Request, @Res() res: Response): Promise<any> {
     const { conferenceName } = req.params;
     const app = new WebhookResponse();
@@ -604,7 +961,7 @@ export class CallControllerController {
       answerOnBridge: true,
       target: [
         {
-          type: "phone",
+          type: MemberType.EXTERNAL_PHONE,
           number: callForwardPhoneNumber.replace(/[+\s]/g, ""),
           trunk: carrierName,
         },
@@ -703,7 +1060,8 @@ export class CallControllerController {
         groupCallSetting === GroupCallSettingRingingType.EXTERNAL_NUMBER ||
         groupCallSetting === GroupCallSettingRingingType.HANG_UP ||
         groupCallSetting === GroupCallSettingRingingType.A_ROLE_IN_GROUP ||
-        groupCallSetting === GroupCallSettingRingingType.CALL_FORWARDING;
+        groupCallSetting === GroupCallSettingRingingType.CALL_FORWARDING ||
+        groupCallSetting === GroupCallSettingRingingType.IVR;
       const listPhoneFirstInviteRinging = currentCallLog?.listPhoneFirstInviteRinging || [];
       const isEnableQueueMedia = !!currentCallLog?.queueTimeout && currentCallLog?.isWelcomeMedia && !callSettingDidNotHaveQueueMedia;
       const isTriggerQueueMedia = currentCallLog?.isTriggerQueueMedia;
@@ -753,6 +1111,38 @@ export class CallControllerController {
       console.log("🚀 ~ file: call-controller.controller.ts:362 ~ CallControllerController ~ conferenceStatus ~ error:", error);
       res.sendStatus(503);
     }
+  }
+
+  @Post("conference-status-ivr")
+  async conferenceStatusIVR(@Req() req: Request, @Res() res: Response): Promise<any> {
+    const { body } = req;
+    const { conference_sid, event, members, friendly_name, call_sid, to, time, direction, duration } = body;
+    if (!event) return res.sendStatus(200);
+    const currentCallLog: IConfCall = await this.callControllerService.getCallLogOfCall(friendly_name);
+    const listPhoneFirstInviteRinging = currentCallLog?.listPhoneFirstInviteRinging || [];
+    await this.callControllerService.updateListMemberOfConference(currentCallLog, body);
+    if (event === ConferenceType.START) {
+      await this.callControllerService.triggerTimeoutActionIvr(currentCallLog, body);
+    }
+    if (event === ConferenceType.JOIN && members > 1) {
+      clearTimeout(currentCallLog.ivrTimeoutSid);
+      this.callControllerService.removeAndClearTimeoutIvr(currentCallLog.ivrTimeoutSid);
+      const newestData = await this.callControllerService.getCallLogOfCall(friendly_name);
+      await this.callControllerService.reMappingMemberList(newestData, body);
+      if (listPhoneFirstInviteRinging.includes(call_sid)) {
+        await this.callControllerService.endCallOfFirstInviteMemberAndUpdateListMember(currentCallLog, body);
+      }
+    }
+    if (event === ConferenceType.END || (event === ConferenceType.LEAVE && members === 0)) {
+      if (currentCallLog.ivrTimeoutSid) {
+        clearTimeout(currentCallLog.ivrTimeoutSid);
+        this.callControllerService.removeAndClearTimeoutIvr(currentCallLog.ivrTimeoutSid);
+      }
+      await this.callControllerService.updateMemberAndStateOfEndedConference(currentCallLog, body, false, false);
+    }
+    const updatedLog = await this.callControllerService.getCallLogOfCall(friendly_name);
+    const response = await axios.post(`${process.env.CHATCHILLA_BACKEND_URL}/voice-log`, { log: updatedLog });
+    return res.sendStatus(200);
   }
 
   // get - calllog by conference name

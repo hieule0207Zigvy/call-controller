@@ -17,6 +17,7 @@ export class CallControllerService {
     baseUrl: process.env.JAMBONZ_REST_API_BASE_URL,
   });
   private fallOverTimeOutList = {};
+  private ivrTimeOutList = {};
   private expiredTime = 3 * Timer.month;
 
   async endAllRingingCall(callSids: string[]): Promise<any> {
@@ -70,14 +71,28 @@ export class CallControllerService {
     return (this.fallOverTimeOutList[masterCallId] = timeout);
   };
 
+  pushTimeOutIvr = (timeout: any, masterCallId: string) => {
+    return (this.ivrTimeOutList[masterCallId] = timeout);
+  };
+
   removeAndClearTimeout = (masterCallId: string) => {
     clearTimeout(this.fallOverTimeOutList[masterCallId]);
     const newList = _.omit(this.fallOverTimeOutList, [masterCallId]);
     return this.setFallOverTimeOutList(newList);
   };
 
+  removeAndClearTimeoutIvr = (masterCallId: string) => {
+    clearTimeout(this.ivrTimeOutList[masterCallId]);
+    const newList = _.omit(this.ivrTimeOutList, [masterCallId]);
+    return this.setFallOverTimeOutListIvr(newList);
+  };
+
   setFallOverTimeOutList = (fallOverTimeOutList: []) => {
     return (this.fallOverTimeOutList = fallOverTimeOutList);
+  };
+
+  setFallOverTimeOutListIvr = (ivrTimeOutList: []) => {
+    return (this.ivrTimeOutList = ivrTimeOutList);
   };
 
   setCallLogToRedis = async (callLogKey: string, newCallLog: any, currentCallLog: IConfCall) => {
@@ -92,7 +107,7 @@ export class CallControllerService {
     return result;
   };
 
-  getCallSettings = async (callSettingData: any) => {
+  getCallSettings = async (callSettingData: any, to: string) => {
     const memberNeedToCall = [];
     let welcomeMedia = "";
     let queueMedia = "";
@@ -105,7 +120,8 @@ export class CallControllerService {
     let isEnableVoiceMail = false;
     let isForwardCall = false;
     let callForwardPhoneNumber = "";
-    let welcomeMediaUrl = false;
+    const ivrData: any = {};
+    let isIVR = false;
 
     const userId = [];
     try {
@@ -121,6 +137,7 @@ export class CallControllerService {
         other_group,
         owner,
         call_setting_auto_record,
+        IVR,
       } = callSettingData;
       const voipCarrier = owner?.voip_carrier;
       const carrierName = await this.jambonzService.getCarrierName(voipCarrier);
@@ -129,6 +146,23 @@ export class CallControllerService {
       const groupCallSetting = type;
 
       switch (type) {
+        case GroupCallSettingRingingType.IVR: {
+          isIVR = true;
+          const { ivr_timeout_seconds = 45, ivr_listen_dtmf, ivr_welcome_media, failover, timeout, action = [] } = IVR[0];
+          if (ivr_welcome_media) {
+            ivrData.welcomeMedia = ivr_welcome_media;
+          }
+          //time out
+          const timeoutData = this.handleTimeoutDataIvr(timeout, carrierName, to);
+          const failoverData = this.handleFailoverDataIvr(failover, carrierName, to);
+          const actionData = this.handleDataActionIvr(action, carrierName, owner, to);
+          ivrData.timeoutData = timeoutData;
+          ivrData.failoverData = failoverData;
+          ivrData.actionData = actionData;
+          ivrData.listenDtmf = ivr_listen_dtmf;
+          ivrData.timeout = ivr_timeout_seconds || 45;
+          break;
+        }
         case GroupCallSettingRingingType.HANG_UP: {
           //pass
 
@@ -163,7 +197,6 @@ export class CallControllerService {
         }
         case GroupCallSettingRingingType.MEMBER: {
           // pass
-
           members.forEach(member => {
             if (call_setting_member_id.includes(member.id)) {
               const { email } = member;
@@ -274,27 +307,27 @@ export class CallControllerService {
           break;
         }
         case GroupCallSettingRingingType.OWNER: {
-          if (owner) {
-            const { email } = owner;
-            const sipName = getNameOfEmail(email);
-            if (!!sipName) {
-              memberNeedToCall.push({ type: MemberType.USER, name: `${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}`, trunk: carrierName });
-              const user = {};
-              user[`${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}`] = owner.id;
-              userId.push(user);
-            }
-          } else {
-            members.forEach(member => {
-              const { email } = member;
-              const sipName = getNameOfEmail(email);
-              if (!!sipName) {
-                memberNeedToCall.push({ type: MemberType.USER, name: `${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}`, trunk: carrierName });
-                const user = {};
-                user[`${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}`] = member.id;
-                userId.push(user);
-              }
-            });
+          // if (owner) {
+          const { email } = owner;
+          const sipName = getNameOfEmail(email);
+          if (!!sipName) {
+            memberNeedToCall.push({ type: MemberType.USER, name: `${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}`, trunk: carrierName });
+            const user = {};
+            user[`${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}`] = owner.id;
+            userId.push(user);
           }
+          // } else {
+          //   members.forEach(member => {
+          //     const { email } = member;
+          //     const sipName = getNameOfEmail(email);
+          //     if (!!sipName) {
+          //       memberNeedToCall.push({ type: MemberType.USER, name: `${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}`, trunk: carrierName });
+          //       const user = {};
+          //       user[`${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}`] = member.id;
+          //       userId.push(user);
+          //     }
+          //   });
+          // }
           if (call_setting_welcome_media) {
             welcomeMedia = call_setting_welcome_media;
             queueMedia = queue_settings.queue_media;
@@ -328,6 +361,8 @@ export class CallControllerService {
         isWelcomeMedia: !!call_setting_welcome_media,
         voipCarrier,
         groupCallSetting,
+        isIVR,
+        ivrData,
       };
     } catch (error) {
       console.log("🚀 ~ file: call-controller.service.ts:271 ~ error:", error);
@@ -389,7 +424,7 @@ export class CallControllerService {
     const newData = { members: newMembers, currentMemberInConf: members, masterCallId: currentCallLog?.masterCallId };
     if (!currentCallLog?.masterCallId) newData.masterCallId = call_sid;
     await this.setCallLogToRedis(friendly_name, newData, currentCallLog);
-    return
+    return;
   };
 
   triggerFallOverTimeoutWithoutQueueMedia = async (currentCallLog: IConfCall, jambonzLog: any) => {
@@ -417,6 +452,7 @@ export class CallControllerService {
 
   reMappingMemberList = async (currentCallLog: IConfCall, jambonzLog: any) => {
     const { call_sid, to, time, members, friendly_name } = jambonzLog;
+    console.log("🚀 ~ file: call-controller.service.ts:455 ~ CallControllerService ~ reMappingMemberList= ~ jambonzLog:", jambonzLog)
     const currentMembers = currentCallLog.members;
     const currentMemberCallSids = currentMembers.map((m: ILegMember) => m.callId);
     if (!currentMemberCallSids.includes(call_sid)) {
@@ -486,5 +522,219 @@ export class CallControllerService {
       await axios.post(`${process.env.CHATCHILLA_BACKEND_URL}/voice-log`, { log: { ...currentCallLog, ...newData } });
       return;
     }
+  };
+
+  handleTimeoutDataIvr = (timeoutData, carrierName, to) => {
+    const timeoutHandle: any = {};
+    const timeoutMemberNeedToCall = [];
+    const timeoutUserId = [];
+    const { timeout_media, timeout_action, timeout_external_number, timeout_other_group, timeout_member, member } = timeoutData;
+    if (timeout_media) {
+      timeoutHandle.timeoutMedia = timeout_media;
+    }
+    if (timeout_action === GroupCallSettingRingingType.EXTERNAL_NUMBER) {
+      timeoutMemberNeedToCall.push({ type: MemberType.EXTERNAL_PHONE, number: timeout_external_number.replace(/[\s+]/g, ""), trunk: carrierName });
+      timeoutHandle.fromNumber = to.replace(/[\s+]/g, "");
+    }
+    if (timeout_action === GroupCallSettingRingingType.MEMBER) {
+      member.forEach(member => {
+        if (timeout_member.includes(member.id)) {
+          const { email } = member;
+          const sipName = getNameOfEmail(email);
+          if (!!sipName) {
+            timeoutMemberNeedToCall.push({ type: MemberType.USER, name: `${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}`, trunk: carrierName });
+            let user = {};
+            user[`${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}`] = member.id;
+            timeoutUserId.push(user);
+          }
+        }
+      });
+    }
+    if (timeout_action === GroupCallSettingRingingType.OTHER_GROUP) {
+      const timeoutMemberInOtherGroup = timeout_other_group.members;
+      timeoutMemberInOtherGroup.forEach(member => {
+        const { email } = member;
+        const sipName = getNameOfEmail(email);
+        if (!!sipName) {
+          timeoutMemberNeedToCall.push({ type: MemberType.USER, name: `${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}`, trunk: carrierName });
+          let user = {};
+          user[`${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}`] = member.id;
+          timeoutUserId.push(user);
+        }
+      });
+    }
+    timeoutHandle.timeoutMemberNeedToCall = timeoutMemberNeedToCall;
+    timeoutHandle.timeoutUserId = timeoutUserId;
+    return timeoutHandle;
+  };
+
+  handleFailoverDataIvr = (failoverData, carrierName, to) => {
+    const failoverHandle: any = {};
+    const failoverMemberNeedToCall = [];
+    const failoverUserId = [];
+    const { failover_media, failover_action, failover_external_number, failover_other_group, failover_member, member } = failoverData;
+    if (failover_media) {
+      failoverHandle.failoverMedia = failover_media;
+    }
+    if (failover_action === GroupCallSettingRingingType.EXTERNAL_NUMBER) {
+      failoverMemberNeedToCall.push({ type: MemberType.EXTERNAL_PHONE, number: failover_external_number.replace(/[\s+]/g, ""), trunk: carrierName });
+      failoverHandle.fromNumber = to.replace(/[\s+]/g, "");
+    }
+    if (failover_action === GroupCallSettingRingingType.MEMBER) {
+      member.forEach(member => {
+        if (failover_member.includes(member.id)) {
+          const { email } = member;
+          const sipName = getNameOfEmail(email);
+          if (!!sipName) {
+            failoverMemberNeedToCall.push({ type: MemberType.USER, name: `${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}`, trunk: carrierName });
+            let user = {};
+            user[`${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}`] = member.id;
+            failoverUserId.push(user);
+          }
+        }
+      });
+    }
+    if (failover_action === GroupCallSettingRingingType.OTHER_GROUP) {
+      const failoverMemberInOtherGroup = failover_other_group.members;
+      failoverMemberInOtherGroup.forEach(member => {
+        const { email } = member;
+        const sipName = getNameOfEmail(email);
+        if (!!sipName) {
+          failoverMemberNeedToCall.push({ type: MemberType.USER, name: `${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}`, trunk: carrierName });
+          let user = {};
+          user[`${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}`] = member.id;
+          failoverUserId.push(user);
+        }
+      });
+    }
+    failoverHandle.failoverMemberNeedToCall = failoverMemberNeedToCall;
+    failoverHandle.failoverUserId = failoverUserId;
+    return failoverHandle;
+  };
+
+  handleDataActionIvr = (action, carrierName, ownerData, to) => {
+    const ivrData: any = {};
+    action.forEach(actionData => {
+      const { DMTF } = actionData;
+      const dmtf = {
+        welcomeMedia: "",
+        memberNeedToCall: [],
+        userId: [],
+        fromNumber: "",
+        isHangup: false,
+        isForward: false,
+      };
+      dmtf.welcomeMedia = actionData[`ivr_dtmf_${DMTF}_welcome_media`];
+      const type = actionData[`ivr_dtmf_${DMTF}_type`];
+      switch (type) {
+        case GroupCallSettingRingingType.OWNER: {
+          const { email } = ownerData;
+          const sipName = getNameOfEmail(email);
+          if (!!sipName) {
+            dmtf.memberNeedToCall.push({ type: MemberType.USER, name: `${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}`, trunk: carrierName });
+            let user = {};
+            user[`${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}`] = ownerData.id;
+            dmtf.userId.push(user);
+          }
+          ivrData[DMTF] = dmtf;
+          break;
+        }
+        case GroupCallSettingRingingType.MEMBER: {
+          const { member } = actionData;
+          const call_setting_member_id = actionData[`ivr_dtmf_${DMTF}_member_id`];
+          member.forEach(m => {
+            if (call_setting_member_id.includes(m.id)) {
+              const { email } = m;
+              const sipName = getNameOfEmail(email);
+              if (!!sipName) {
+                dmtf.memberNeedToCall.push({ type: MemberType.USER, name: `${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}`, trunk: carrierName });
+                let user = {};
+                user[`${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}`] = m.id;
+                dmtf.userId.push(user);
+              }
+            }
+          });
+          ivrData[DMTF] = dmtf;
+          break;
+        }
+        case GroupCallSettingRingingType.GROUP: {
+          const { members } = actionData[`ivr_dtmf_${DMTF}_group_id`];
+          members.forEach(m => {
+            const { email } = m;
+            const sipName = getNameOfEmail(email);
+            if (!!sipName) {
+              dmtf.memberNeedToCall.push({ type: MemberType.USER, name: `${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}`, trunk: carrierName });
+              let user = {};
+              user[`${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}`] = m.id;
+              dmtf.userId.push(user);
+            }
+          });
+          ivrData[DMTF] = dmtf;
+          break;
+        }
+        case GroupCallSettingRingingType.OTHER_GROUP: {
+          const { members } = actionData[`ivr_dtmf_${DMTF}_other_group_id`];
+          members.forEach(member => {
+            const { email } = member;
+            const sipName = getNameOfEmail(email);
+            if (!!sipName) {
+              dmtf.memberNeedToCall.push({ type: MemberType.USER, name: `${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}`, trunk: carrierName });
+              let user = {};
+              user[`${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}`] = member.id;
+              dmtf.userId.push(user);
+            }
+          });
+          ivrData[DMTF] = dmtf;
+          break;
+        }
+        case GroupCallSettingRingingType.EXTERNAL_NUMBER: {
+          const externalNumber = actionData[`ivr_dtmf_${DMTF}_external_number`];
+          dmtf.memberNeedToCall.push({
+            type: MemberType.EXTERNAL_PHONE,
+            number: externalNumber.replace(/[\s+]/g, ""),
+            trunk: carrierName,
+          });
+          dmtf.fromNumber = to.replace(/[\s+]/g, "");
+          dmtf.isForward = true;
+          ivrData[DMTF] = dmtf;
+          break;
+        }
+        case GroupCallSettingRingingType.HANG_UP: {
+          dmtf.isHangup = true;
+          ivrData[DMTF] = dmtf;
+          break;
+        }
+        default:
+          break;
+      }
+    });
+    return ivrData;
+  };
+
+  triggerTimeoutActionIvr = async (currentCallLog: IConfCall, jambonzLog: any) => {
+    try {
+      const { call_sid, friendly_name, time } = jambonzLog;
+      const newData = { ivrTimeoutSid: "", masterCallId: call_sid, status: ConfCallStatus.START, eventTime: time };
+      const timeoutFallOverFunc = setTimeout(async () => {
+        const test = await axios.put(
+          `${process.env.JAMBONZ_REST_API_BASE_URL}/Accounts/${process.env.JAMBONZ_ACCOUNT_SID}/Calls/${call_sid}`,
+          { call_hook: `${process.env.BACKEND_URL}/call-controller/conference-timeout-ivr-hook/${friendly_name}` },
+          {
+            headers: {
+              Authorization: `Bearer ${process.env.JAMBONZ_API_KEY}`,
+            },
+          },
+        );
+      }, 45000);
+      this.pushTimeOutIvr(timeoutFallOverFunc, call_sid);
+      newData.ivrTimeoutSid = call_sid;
+      return this.setCallLogToRedis(friendly_name, newData, currentCallLog);
+    } catch (error) {
+      console.log("🚀 ~ file: call-controller.service.ts:342 ~ CallControllerService ~ triggerFallOverTimeoutWithoutQueueMedia= ~ error:", error);
+    }
+  };
+
+  clearTimeoutConf = async (timeoutSid: string) => {
+    return clearTimeout(timeoutSid);
   };
 }
