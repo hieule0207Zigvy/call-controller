@@ -51,6 +51,7 @@ export interface IConfCall {
   ivrTimeoutSid?: any;
   groupId?: string;
   callerNumber?: string;
+  callerUserId?: string;
 }
 
 export interface ITypeOfToUser {

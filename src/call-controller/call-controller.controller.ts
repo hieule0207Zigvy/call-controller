@@ -193,7 +193,7 @@ export class CallControllerController {
       let toUser: IToUserType = {};
       let fromDid = "";
       if (!headers) return res.status(400);
-      const { ani = "", to, conferencename, carrier } = headers;
+      const { ani = "", to, conferencename, carrier, userid } = headers;
       fromDid = `${from}@${process.env.CHATCHILLA_SIP_DOMAIN}`;
       if (!!ani) fromDid = ani;
       const isMatchPhoneFormat = to.match(/<sip:(\d+)@/) || to.match(/<sip:(\+\d+)@/);
@@ -254,6 +254,7 @@ export class CallControllerController {
         queueTimeout: null,
         isTriggerQueueMedia: null,
         isWelcomeMedia: null,
+        callerUserId: userid
       };
 
       await this.callControllerService.setCallLogToRedis(uniqNameConference, initCallLog, null);
