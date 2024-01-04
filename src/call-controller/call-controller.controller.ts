@@ -254,7 +254,7 @@ export class CallControllerController {
         queueTimeout: null,
         isTriggerQueueMedia: null,
         isWelcomeMedia: null,
-        callerUserId: userid
+        callerUserId: userid,
       };
 
       await this.callControllerService.setCallLogToRedis(uniqNameConference, initCallLog, null);
@@ -374,7 +374,7 @@ export class CallControllerController {
           },
         },
       );
-      const { members = [] } = currentCallLog;
+      const members = currentCallLog?.members || [];
       const updateMemberList = members;
       if (call_sid === currentCallLog?.masterCallId) {
         await this.callControllerService.setCallLogToRedis(conferenceName, { isMute: conf_mute_status === "mute" }, currentCallLog);
@@ -984,7 +984,8 @@ export class CallControllerController {
     const { call_sid, sip_status, call_status, to } = req.body;
     console.log("🚀 ~ file: call-controller.controller.ts:575 ~ CallControllerController ~ callStatus ~ req.body:", req.body);
     const currentCallLog: IConfCall = await this.callControllerService.getCallLogOfCall(conferenceName);
-    const { members = [], listPhoneFirstInviteRinging = [] } = currentCallLog;
+    const { listPhoneFirstInviteRinging = [] } = currentCallLog;
+    const members = currentCallLog?.members || [];
     const updateMemberList = members;
     const memberIds = updateMemberList.map(m => m.callId);
     if (call_status === CallStatus.trying && !memberIds.includes(call_sid)) {
