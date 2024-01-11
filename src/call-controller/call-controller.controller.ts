@@ -68,6 +68,7 @@ export class CallControllerController {
           groupCallSetting,
           isIVR,
           ivrData,
+          userIds,
         } = await this.callControllerService.getCallSettings(callSettingData, to);
         if (isIVR) {
           app
@@ -174,6 +175,7 @@ export class CallControllerController {
           isTriggerQueueMedia: false,
           isWelcomeMedia,
           groupCallSetting,
+          userIds,
         };
         await this.callControllerService.setCallLogToRedis(uniqNameConference, initCallLog, null);
       } else res.status(200);
@@ -255,6 +257,7 @@ export class CallControllerController {
         isTriggerQueueMedia: null,
         isWelcomeMedia: null,
         callerUserId: userid,
+        userIds: [],
       };
 
       await this.callControllerService.setCallLogToRedis(uniqNameConference, initCallLog, null);
@@ -459,12 +462,9 @@ export class CallControllerController {
     const { body } = req;
     const { customerData, digits, call_sid } = body;
     const { timeoutData, failoverData, actionData, listenDtmf, timeout = 45 } = customerData.ivrData;
-    console.log("🚀 ~ file: call-controller.controller.ts:461 ~ CallControllerController ~ gatherDtmfHook ~ timeoutData:", timeoutData);
-    console.log("🚀 ~ file: call-controller.controller.ts:461 ~ CallControllerController ~ gatherDtmfHook ~ failoverData:", failoverData);
     const { uniqNameConference, from, conversationId, groupId, userId, groupCallSetting } = customerData;
     const allDtmf = listenDtmf.map(item => item.toString());
     const isDtmfInListenList = allDtmf.includes(digits);
-    console.log("🚀 ~ file: call-controller.controller.ts:465 ~ CallControllerController ~ gatherDtmfHook ~ isDtmfInListenList:", isDtmfInListenList);
     if (!isDtmfInListenList) {
       const { failoverMedia } = failoverData;
       app
@@ -505,6 +505,7 @@ export class CallControllerController {
         ivrTimeoutData: timeoutData,
         groupId,
         callerNumber: from,
+        userIds: userId,
       };
       await this.callControllerService.setCallLogToRedis(uniqNameConference, initCallLog, null);
       return res.status(200).json(app);
@@ -557,6 +558,7 @@ export class CallControllerController {
       ivrTimeoutData: timeoutData,
       groupId,
       callerNumber: from,
+      userIds: userId,
     };
     await this.callControllerService.setCallLogToRedis(uniqNameConference, initCallLog, null);
 
@@ -987,6 +989,7 @@ export class CallControllerController {
     const { listPhoneFirstInviteRinging = [] } = currentCallLog;
     const members = currentCallLog?.members || [];
     const updateMemberList = members;
+    console.log("🚀 ~ CallControllerController ~ callStatus ~ members:", members)
     const memberIds = updateMemberList.map(m => m.callId);
     if (call_status === CallStatus.trying && !memberIds.includes(call_sid)) {
       let type = "";

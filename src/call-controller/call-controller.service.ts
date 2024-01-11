@@ -122,6 +122,7 @@ export class CallControllerService {
     let callForwardPhoneNumber = "";
     const ivrData: any = {};
     let isIVR = false;
+    let userIds = [];
 
     const userId = [];
     try {
@@ -199,6 +200,7 @@ export class CallControllerService {
           // pass
           members.forEach(member => {
             if (call_setting_member_id.includes(member.id)) {
+              userIds.push(member.id);
               const { email } = member;
               const sipName = getNameOfEmail(email);
               if (!!sipName) {
@@ -226,6 +228,7 @@ export class CallControllerService {
             const { roles } = member;
             if (roles.includes(call_setting_role)) {
               const { email } = member;
+              userIds.push(member.id);
               const sipName = getNameOfEmail(email);
               if (!!sipName) {
                 memberNeedToCall.push({ type: MemberType.USER, name: `${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}`, trunk: carrierName });
@@ -242,6 +245,7 @@ export class CallControllerService {
         }
         case GroupCallSettingRingingType.GROUP: {
           // pass
+          userIds = members.map(item => item.id);
           members.forEach(member => {
             const { email } = member;
             const sipName = getNameOfEmail(email);
@@ -265,6 +269,7 @@ export class CallControllerService {
         }
         case GroupCallSettingRingingType.OTHER_GROUP: {
           // pass
+          userIds = memberInOtherGroup.map(item => item.id);
           memberInOtherGroup.forEach(member => {
             const { email } = member;
             const sipName = getNameOfEmail(email);
@@ -285,6 +290,7 @@ export class CallControllerService {
         case GroupCallSettingRingingType.MEMBER_AUTO_ASSIGN: {
           members.forEach(member => {
             if (member.auto_assign) {
+              userIds.push(member.id);
               const { email } = member;
               const sipName = getNameOfEmail(email);
               if (!!sipName) {
@@ -308,6 +314,7 @@ export class CallControllerService {
         }
         case GroupCallSettingRingingType.OWNER: {
           // if (owner) {
+          userIds.push(owner.id);
           const { email } = owner;
           const sipName = getNameOfEmail(email);
           if (!!sipName) {
@@ -363,6 +370,7 @@ export class CallControllerService {
         groupCallSetting,
         isIVR,
         ivrData,
+        userIds,
       };
     } catch (error) {
       console.log("🚀 ~ file: call-controller.service.ts:271 ~ error:", error);
@@ -452,7 +460,7 @@ export class CallControllerService {
 
   reMappingMemberList = async (currentCallLog: IConfCall, jambonzLog: any) => {
     const { call_sid, to, time, members, friendly_name } = jambonzLog;
-    console.log("🚀 ~ file: call-controller.service.ts:455 ~ CallControllerService ~ reMappingMemberList= ~ jambonzLog:", jambonzLog)
+    console.log("🚀 ~ file: call-controller.service.ts:455 ~ CallControllerService ~ reMappingMemberList= ~ jambonzLog:", jambonzLog);
     const currentMembers = currentCallLog.members;
     const currentMemberCallSids = currentMembers.map((m: ILegMember) => m.callId);
     if (!currentMemberCallSids.includes(call_sid)) {

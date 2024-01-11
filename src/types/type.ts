@@ -52,6 +52,7 @@ export interface IConfCall {
   groupId?: string;
   callerNumber?: string;
   callerUserId?: string;
+  userIds?: string[];
 }
 
 export interface ITypeOfToUser {
