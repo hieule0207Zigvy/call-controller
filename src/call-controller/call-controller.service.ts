@@ -205,6 +205,7 @@ export class CallControllerService {
               const sipName = getNameOfEmail(email);
               if (!!sipName) {
                 memberNeedToCall.push({ type: MemberType.USER, name: `${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}`, trunk: carrierName });
+                memberNeedToCall.push({ type: MemberType.USER, name: `mobile-${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}`, trunk: carrierName });
                 const user = {};
                 user[`${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}`] = member.id;
                 userId.push(user);
@@ -232,6 +233,7 @@ export class CallControllerService {
               const sipName = getNameOfEmail(email);
               if (!!sipName) {
                 memberNeedToCall.push({ type: MemberType.USER, name: `${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}`, trunk: carrierName });
+                memberNeedToCall.push({ type: MemberType.USER, name: `mobile-${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}`, trunk: carrierName });
                 const user = {};
                 user[`${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}`] = member.id;
                 userId.push(user);
@@ -251,6 +253,7 @@ export class CallControllerService {
             const sipName = getNameOfEmail(email);
             if (!!sipName) {
               memberNeedToCall.push({ type: MemberType.USER, name: `${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}`, trunk: carrierName });
+              memberNeedToCall.push({ type: MemberType.USER, name: `mobile-${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}`, trunk: carrierName });
               const user = {};
               user[`${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}`] = member.id;
               userId.push(user);
@@ -275,6 +278,7 @@ export class CallControllerService {
             const sipName = getNameOfEmail(email);
             if (!!sipName) {
               memberNeedToCall.push({ type: MemberType.USER, name: `${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}`, trunk: carrierName });
+              memberNeedToCall.push({ type: MemberType.USER, name: `mobile-${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}`, trunk: carrierName });
               const user = {};
               user[`${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}`] = member.id;
               userId.push(user);
@@ -295,6 +299,7 @@ export class CallControllerService {
               const sipName = getNameOfEmail(email);
               if (!!sipName) {
                 memberNeedToCall.push({ type: MemberType.USER, name: `${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}`, trunk: carrierName });
+                memberNeedToCall.push({ type: MemberType.USER, name: `mobile-${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}`, trunk: carrierName });
                 const user = {};
                 user[`${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}`] = member.id;
                 userId.push(user);
@@ -319,6 +324,7 @@ export class CallControllerService {
           const sipName = getNameOfEmail(email);
           if (!!sipName) {
             memberNeedToCall.push({ type: MemberType.USER, name: `${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}`, trunk: carrierName });
+            memberNeedToCall.push({ type: MemberType.USER, name: `mobile-${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}`, trunk: carrierName });
             const user = {};
             user[`${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}`] = owner.id;
             userId.push(user);
@@ -551,6 +557,7 @@ export class CallControllerService {
           const sipName = getNameOfEmail(email);
           if (!!sipName) {
             timeoutMemberNeedToCall.push({ type: MemberType.USER, name: `${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}`, trunk: carrierName });
+            timeoutMemberNeedToCall.push({ type: MemberType.USER, name: `mobile-${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}`, trunk: carrierName });
             let user = {};
             user[`${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}`] = member.id;
             timeoutUserId.push(user);
@@ -565,6 +572,7 @@ export class CallControllerService {
         const sipName = getNameOfEmail(email);
         if (!!sipName) {
           timeoutMemberNeedToCall.push({ type: MemberType.USER, name: `${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}`, trunk: carrierName });
+          timeoutMemberNeedToCall.push({ type: MemberType.USER, name: `mobile-${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}`, trunk: carrierName });
           let user = {};
           user[`${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}`] = member.id;
           timeoutUserId.push(user);
@@ -595,6 +603,7 @@ export class CallControllerService {
           const sipName = getNameOfEmail(email);
           if (!!sipName) {
             failoverMemberNeedToCall.push({ type: MemberType.USER, name: `${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}`, trunk: carrierName });
+            failoverMemberNeedToCall.push({ type: MemberType.USER, name: `mobile-${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}`, trunk: carrierName });
             let user = {};
             user[`${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}`] = member.id;
             failoverUserId.push(user);
@@ -609,6 +618,7 @@ export class CallControllerService {
         const sipName = getNameOfEmail(email);
         if (!!sipName) {
           failoverMemberNeedToCall.push({ type: MemberType.USER, name: `${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}`, trunk: carrierName });
+          failoverMemberNeedToCall.push({ type: MemberType.USER, name: `mobile-${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}`, trunk: carrierName });
           let user = {};
           user[`${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}`] = member.id;
           failoverUserId.push(user);
@@ -640,6 +650,7 @@ export class CallControllerService {
           const sipName = getNameOfEmail(email);
           if (!!sipName) {
             dmtf.memberNeedToCall.push({ type: MemberType.USER, name: `${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}`, trunk: carrierName });
+            dmtf.memberNeedToCall.push({ type: MemberType.USER, name: `mobile-${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}`, trunk: carrierName });
             let user = {};
             user[`${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}`] = ownerData.id;
             dmtf.userId.push(user);
@@ -656,6 +667,7 @@ export class CallControllerService {
               const sipName = getNameOfEmail(email);
               if (!!sipName) {
                 dmtf.memberNeedToCall.push({ type: MemberType.USER, name: `${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}`, trunk: carrierName });
+                dmtf.memberNeedToCall.push({ type: MemberType.USER, name: `mobile-${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}`, trunk: carrierName });
                 let user = {};
                 user[`${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}`] = m.id;
                 dmtf.userId.push(user);
@@ -672,6 +684,7 @@ export class CallControllerService {
             const sipName = getNameOfEmail(email);
             if (!!sipName) {
               dmtf.memberNeedToCall.push({ type: MemberType.USER, name: `${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}`, trunk: carrierName });
+              dmtf.memberNeedToCall.push({ type: MemberType.USER, name: `mobile-${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}`, trunk: carrierName });
               let user = {};
               user[`${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}`] = m.id;
               dmtf.userId.push(user);
@@ -687,6 +700,7 @@ export class CallControllerService {
             const sipName = getNameOfEmail(email);
             if (!!sipName) {
               dmtf.memberNeedToCall.push({ type: MemberType.USER, name: `${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}`, trunk: carrierName });
+              dmtf.memberNeedToCall.push({ type: MemberType.USER, name: `mobile-${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}`, trunk: carrierName });
               let user = {};
               user[`${sipName}@${process.env.CHATCHILLA_SIP_DOMAIN}`] = member.id;
               dmtf.userId.push(user);
