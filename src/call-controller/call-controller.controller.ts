@@ -68,6 +68,7 @@ export class CallControllerController {
           groupCallSetting,
           isIVR,
           ivrData,
+          userIds,
         } = await this.callControllerService.getCallSettings(callSettingData, to);
         if (isIVR) {
           app
@@ -174,6 +175,7 @@ export class CallControllerController {
           isTriggerQueueMedia: false,
           isWelcomeMedia,
           groupCallSetting,
+          userIds,
         };
         await this.callControllerService.setCallLogToRedis(uniqNameConference, initCallLog, null);
       } else res.status(200);
@@ -255,6 +257,7 @@ export class CallControllerController {
         isTriggerQueueMedia: null,
         isWelcomeMedia: null,
         callerUserId: userid,
+        userIds: [],
       };
 
       await this.callControllerService.setCallLogToRedis(uniqNameConference, initCallLog, null);
@@ -331,6 +334,7 @@ export class CallControllerController {
       //to = {"type": "phone", "number": "17147520454"},
       // } = req.body;
       const { from, to, uniqNameConference, headers = {}, carrier } = req.body;
+      console.log("🚀 ~ CallControllerController ~ makeInviteConference ~ req.body:", req.body)
       const carrierName = await this.jambonzService.getCarrierName(carrier);
       let destination = to;
       destination.trunk = carrierName;
@@ -353,6 +357,7 @@ export class CallControllerController {
         timeout: 55,
         headers: { ...headers, conferenceName: uniqNameConference },
       });
+      console.log("🚀 ~ CallControllerController ~ makeInviteConference ~ log:", log)
       return res.status(200).json(log);
     } catch (err) {
       console.log("🚀 ~ file: call-controller.controller.ts:310 ~ CallControllerController ~ makeInviteConference ~ err:", err);
@@ -459,12 +464,9 @@ export class CallControllerController {
     const { body } = req;
     const { customerData, digits, call_sid } = body;
     const { timeoutData, failoverData, actionData, listenDtmf, timeout = 45 } = customerData.ivrData;
-    console.log("🚀 ~ file: call-controller.controller.ts:461 ~ CallControllerController ~ gatherDtmfHook ~ timeoutData:", timeoutData);
-    console.log("🚀 ~ file: call-controller.controller.ts:461 ~ CallControllerController ~ gatherDtmfHook ~ failoverData:", failoverData);
     const { uniqNameConference, from, conversationId, groupId, userId, groupCallSetting } = customerData;
     const allDtmf = listenDtmf.map(item => item.toString());
     const isDtmfInListenList = allDtmf.includes(digits);
-    console.log("🚀 ~ file: call-controller.controller.ts:465 ~ CallControllerController ~ gatherDtmfHook ~ isDtmfInListenList:", isDtmfInListenList);
     if (!isDtmfInListenList) {
       const { failoverMedia } = failoverData;
       app
@@ -505,6 +507,7 @@ export class CallControllerController {
         ivrTimeoutData: timeoutData,
         groupId,
         callerNumber: from,
+        userIds: userId,
       };
       await this.callControllerService.setCallLogToRedis(uniqNameConference, initCallLog, null);
       return res.status(200).json(app);
@@ -557,6 +560,7 @@ export class CallControllerController {
       ivrTimeoutData: timeoutData,
       groupId,
       callerNumber: from,
+      userIds: userId,
     };
     await this.callControllerService.setCallLogToRedis(uniqNameConference, initCallLog, null);
 
@@ -908,6 +912,7 @@ export class CallControllerController {
     const { listMember = [], uniqNameConference, from, conversationId, groupId, userId, queueTimeout } = customerData;
     // const members = [];
     const callList = _.uniqBy(listMember, "name");
+    console.log("🚀 ~ CallControllerController ~ callHook ~ callList:", callList);
     Promise.all(
       callList.map(async (member: ITypeOfToUser) => {
         let userIdData = "";
@@ -987,6 +992,7 @@ export class CallControllerController {
     const { listPhoneFirstInviteRinging = [] } = currentCallLog;
     const members = currentCallLog?.members || [];
     const updateMemberList = members;
+
     const memberIds = updateMemberList.map(m => m.callId);
     if (call_status === CallStatus.trying && !memberIds.includes(call_sid)) {
       let type = "";

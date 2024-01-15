@@ -218,7 +218,18 @@ export class JambonzService {
       });
 
       if (clientResponse && clientResponse?.status === 201) {
-        return clientResponse?.data?.sid;
+        const mobileParams = {
+          account_sid: process.env.JAMBONZ_ACCOUNT_SID,
+          username: `mobile-${emailName}`,
+          password: process.env.DEFAULT_SIP_CLIENT_PASSWORD,
+          is_active: true,
+        };
+        const mobileClientResponse = await axios.post(`${process.env.JAMBONZ_REST_API_BASE_URL}/Clients`, mobileParams, {
+          headers: {
+            Authorization: `Bearer ${process.env.JAMBONZ_API_KEY}`,
+          },
+        });
+        return mobileClientResponse?.data?.sid;
       }
     } catch (error) {
       console.log("🚀 ~ file: jambonz.service.ts:78 ~ JambonzService ~ createSipAccount= ~ error:", error);
