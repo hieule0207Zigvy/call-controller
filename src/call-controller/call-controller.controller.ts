@@ -992,7 +992,7 @@ export class CallControllerController {
     const { listPhoneFirstInviteRinging = [] } = currentCallLog;
     const members = currentCallLog?.members || [];
     const updateMemberList = members;
-    console.log("🚀 ~ CallControllerController ~ callStatus ~ members:", { members, body: req.body });
+
     const memberIds = updateMemberList.map(m => m.callId);
     if (call_status === CallStatus.trying && !memberIds.includes(call_sid)) {
       let type = "";

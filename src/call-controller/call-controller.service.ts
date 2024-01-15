@@ -435,7 +435,19 @@ export class CallControllerService {
         m.eventTime = time;
       }
     });
-    const newData = { members: newMembers, currentMemberInConf: members, masterCallId: currentCallLog?.masterCallId };
+    const prevStatusConf = currentCallLog.status;
+    const prevIsOneOfMemberAnswer = currentCallLog.isOneOfMemberAnswer;
+    const newData = {
+      members: newMembers,
+      currentMemberInConf: members,
+      masterCallId: currentCallLog?.masterCallId,
+      isOneOfMemberAnswer: currentCallLog.isOneOfMemberAnswer,
+      status: currentCallLog.status,
+    };
+    if (members >= 2 && prevStatusConf === ConfCallStatus.CREATED && prevIsOneOfMemberAnswer === false) {
+      newData.isOneOfMemberAnswer = true;
+      newData.status = ConfCallStatus.START;
+    }
     if (!currentCallLog?.masterCallId) newData.masterCallId = call_sid;
     await this.setCallLogToRedis(friendly_name, newData, currentCallLog);
     return;
@@ -466,7 +478,6 @@ export class CallControllerService {
 
   reMappingMemberList = async (currentCallLog: IConfCall, jambonzLog: any) => {
     const { call_sid, to, time, members, friendly_name } = jambonzLog;
-    console.log("🚀 ~ file: call-controller.service.ts:455 ~ CallControllerService ~ reMappingMemberList= ~ jambonzLog:", jambonzLog);
     const currentMembers = currentCallLog.members;
     const currentMemberCallSids = currentMembers.map((m: ILegMember) => m.callId);
     if (!currentMemberCallSids.includes(call_sid)) {
