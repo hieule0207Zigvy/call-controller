@@ -1,6 +1,6 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { CallStatus, ConfCallStatus, GroupCallSettingRingingType, LegMemberStatus, MemberType } from "src/enums/enum";
-import { IConfCall, ILegMember } from "src/types/type";
+import { CallStatus, ConfCallStatus, ConferenceType, GroupCallSettingRingingType, LegMemberStatus, MemberType } from "src/enums/enum";
+import { IConfCall, ILegMember, ITypeOfToUser } from "src/types/type";
 const jambonz = require("@jambonz/node-client");
 import axios from "axios";
 import { CACHE_MANAGER } from "@nestjs/cache-manager";
@@ -769,5 +769,94 @@ export class CallControllerService {
 
   clearTimeoutConf = async (timeoutSid: string) => {
     return clearTimeout(timeoutSid);
+  };
+
+  makeCallAndConferenceForLiveChat = async (jambonzClient, headers, carrierName, res) => {
+    try {
+      const groupId = headers?.groupid;
+      const uniqNameConference = headers?.conferencename;
+      const callerUserId = headers?.userid;
+      const conversationId = headers?.conversationid;
+      const groupCallSettingResponse = await axios.post(`${process.env.CHATCHILLA_BACKEND_URL}/group/group_member_email`, { groupId });
+      if (groupCallSettingResponse?.status !== 200) return;
+      const { data } = groupCallSettingResponse;
+      const allEmail = data?.userEmail;
+      const userIds = data?.userIds;
+      const listInviteEmail = [];
+      if (allEmail.length > 0) {
+        allEmail.forEach(email => {
+          const emailName = getNameOfEmail(email);
+          listInviteEmail.push({ type: MemberType.USER, name: `${emailName}@${process.env.CHATCHILLA_SIP_DOMAIN}`, trunk: carrierName });
+          listInviteEmail.push({ type: MemberType.USER, name: `mobile-${emailName}@${process.env.CHATCHILLA_SIP_DOMAIN}`, trunk: carrierName });
+        });
+      }
+      jambonzClient.conference({
+        name: uniqNameConference,
+        statusEvents: [ConferenceType.END, ConferenceType.JOIN, ConferenceType.START, ConferenceType.LEAVE],
+        statusHook: "/call-controller/conference-status",
+        startConferenceOnEnter: true,
+        endConferenceOnExit: true,
+      }); // conference created.
+      const initCallLog: IConfCall = {
+        caller: `livechat-${callerUserId}`,
+        isOneOfMemberAnswer: false,
+        confUniqueName: uniqNameConference,
+        masterCallId: "",
+        status: ConfCallStatus.CREATED,
+        members: [],
+        currentMemberInConf: 0,
+        fallOverTimeOutSid: "",
+        isOutboundCall: true,
+        listPhoneFirstInviteRinging: [],
+        eventTime: "",
+        conversationId: conversationId || "",
+        isEnableFallOver: false,
+        fallOverMediaUrl: null,
+        fallOverTimeout: null,
+        timeoutMediaUrl: null,
+        queueMediaUrl: null,
+        queueTimeout: null,
+        isTriggerQueueMedia: null,
+        isWelcomeMedia: null,
+        callerUserId,
+        userIds,
+      };
+      await this.setCallLogToRedis(uniqNameConference, initCallLog, null);
+      res.status(200).json(jambonzClient);
+      Promise.all(
+        listInviteEmail.map(async (member: ITypeOfToUser) => {
+          let userIdData = "";
+          const callRingingSid = await this.client.calls.create({
+            from: `livechat chatchilla`,
+            to: member,
+            call_hook: {
+              url: `${process.env.BACKEND_URL}/call-controller/person-join-conference/${uniqNameConference}`,
+              method: "GET",
+            },
+            call_status_hook: {
+              url: `${process.env.BACKEND_URL}/call-controller/call-status/${uniqNameConference}`,
+              method: "POST",
+            },
+            speech_synthesis_vendor: "google",
+            speech_synthesis_language: "en-US",
+            speech_synthesis_voice: "en-US-Standard-C",
+            speech_recognizer_vendor: "google",
+            speech_recognizer_language: "en-US",
+            timeout: 60,
+            headers: {
+              conversationId,
+              conferenceName: uniqNameConference,
+              groupId,
+              isRequestJoinCall: false,
+              parentSessionId: "",
+              userId: userIdData,
+              fromLiveChat: true,
+            },
+          });
+        }),
+      ).catch(err => {
+        console.log("🚀 ~ file: call-controller.controller.ts:534 ~ CallControllerController ~ callHook ~ err:", err);
+      });
+    } catch (error) {}
   };
 }

@@ -204,7 +204,23 @@ export class JambonzService {
   createSipAccount = async (account: any) => {
     const { email } = account;
     const emailName = getNameOfEmail(email);
+    let isExistSipAccount = "";
     try {
+      const getAllSipAccountResponse = await axios.get(`${process.env.JAMBONZ_REST_API_BASE_URL}/Clients`, {
+        headers: {
+          Authorization: `Bearer ${process.env.JAMBONZ_API_KEY}`,
+        },
+      });
+
+      const allSipAccount = getAllSipAccountResponse?.data;
+      allSipAccount.forEach(sip => {
+        if (sip?.username === emailName) {
+          isExistSipAccount = sip?.client_sid;
+        }
+      });
+
+      if (!!isExistSipAccount) return isExistSipAccount;
+
       const params = {
         account_sid: process.env.JAMBONZ_ACCOUNT_SID,
         username: emailName,
@@ -273,6 +289,36 @@ export class JambonzService {
       }
     } catch (error) {
       console.log("🚀 ~ file: jambonz.service.ts:257 ~ JambonzService ~ getCarrierName= ~ error:", error);
+      return false;
+    }
+  };
+
+  deleteSipAccount = async (email: any) => {
+    const emailName = email;
+    try {
+      const getAllSipAccountResponse = await axios.get(`${process.env.JAMBONZ_REST_API_BASE_URL}/Clients`, {
+        headers: {
+          Authorization: `Bearer ${process.env.JAMBONZ_API_KEY}`,
+        },
+      });
+
+      if (getAllSipAccountResponse && getAllSipAccountResponse?.status === 200) {
+        const allSipAccount = getAllSipAccountResponse?.data;
+        await Promise.all(
+          allSipAccount.map(async sip => {
+            if (sip?.username === emailName || sip?.username === `mobile-${emailName}`) {
+              const deleteSipAccountResponse = await axios.delete(`${process.env.JAMBONZ_REST_API_BASE_URL}/Clients/${sip?.client_sid}`, {
+                headers: {
+                  Authorization: `Bearer ${process.env.JAMBONZ_API_KEY}`,
+                },
+              });
+              return deleteSipAccountResponse?.status;
+            }
+          }),
+        );
+      }
+    } catch (error) {
+      console.log("🚀 ~ file: jambonz.service.ts:78 ~ JambonzService ~ createSipAccount= ~ error:", error);
       return false;
     }
   };

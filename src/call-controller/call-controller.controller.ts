@@ -195,7 +195,13 @@ export class CallControllerController {
       let toUser: IToUserType = {};
       let fromDid = "";
       if (!headers) return res.status(400);
-      const { ani = "", to, conferencename, carrier, userid } = headers;
+      const app = new WebhookResponse();
+
+      const { ani = "", to, conferencename, carrier, userid, fromlivechat } = headers;
+      const carrierName = await this.jambonzService.getCarrierName(carrier);
+      if (fromlivechat) {
+        return this.callControllerService.makeCallAndConferenceForLiveChat(app, headers, carrierName, res);
+      }
       fromDid = `${from}@${process.env.CHATCHILLA_SIP_DOMAIN}`;
       if (!!ani) fromDid = ani;
       const isMatchPhoneFormat = to.match(/<sip:(\d+)@/) || to.match(/<sip:(\+\d+)@/);
@@ -214,9 +220,8 @@ export class CallControllerController {
         }
       }
       // toUser.trunk = "Twilio-test8";
-      const carrierName = await this.jambonzService.getCarrierName(carrier);
+
       toUser.trunk = carrierName;
-      const app = new WebhookResponse();
       let uniqNameConference = conferencename;
       if (!conferencename) uniqNameConference = getUniqConferenceName();
       // app
@@ -334,7 +339,7 @@ export class CallControllerController {
       //to = {"type": "phone", "number": "17147520454"},
       // } = req.body;
       const { from, to, uniqNameConference, headers = {}, carrier } = req.body;
-      console.log("🚀 ~ CallControllerController ~ makeInviteConference ~ req.body:", req.body)
+      console.log("🚀 ~ CallControllerController ~ makeInviteConference ~ req.body:", req.body);
       const carrierName = await this.jambonzService.getCarrierName(carrier);
       let destination = to;
       destination.trunk = carrierName;
@@ -357,7 +362,7 @@ export class CallControllerController {
         timeout: 55,
         headers: { ...headers, conferenceName: uniqNameConference },
       });
-      console.log("🚀 ~ CallControllerController ~ makeInviteConference ~ log:", log)
+      console.log("🚀 ~ CallControllerController ~ makeInviteConference ~ log:", log);
       return res.status(200).json(log);
     } catch (err) {
       console.log("🚀 ~ file: call-controller.controller.ts:310 ~ CallControllerController ~ makeInviteConference ~ err:", err);

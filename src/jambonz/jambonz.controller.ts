@@ -41,4 +41,13 @@ export class JambonzController {
     if (!isCreated) return res.status(500).json({ msg: "Failed to assignPhoneNumber" });
     return res.status(200).json({ isCreated });
   }
+
+  @Post("delete-sip-account")
+  async deleteSipClient(@Req() req: Request, @Res() res: Response): Promise<any> {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ msg: "payload error for deleteSipClient" });
+    const isDelete = await this.jambonzService.deleteSipAccount(email);
+    if (!isDelete) return res.status(500).json({ msg: "Failed to deleteSipClient" });
+    return res.status(200).json({ isDelete });
+  }
 }
