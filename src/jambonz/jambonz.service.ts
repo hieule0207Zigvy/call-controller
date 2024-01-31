@@ -295,6 +295,8 @@ export class JambonzService {
 
   deleteSipAccount = async (email: any) => {
     const emailName = email;
+    const sipName = getNameOfEmail(emailName);
+    console.log("🚀 ~ JambonzService ~ deleteSipAccount ~ emailName:", emailName);
     try {
       const getAllSipAccountResponse = await axios.get(`${process.env.JAMBONZ_REST_API_BASE_URL}/Clients`, {
         headers: {
@@ -304,18 +306,19 @@ export class JambonzService {
 
       if (getAllSipAccountResponse && getAllSipAccountResponse?.status === 200) {
         const allSipAccount = getAllSipAccountResponse?.data;
+        console.log("🚀 ~ JambonzService ~ deleteSipAccount ~ allSipAccount:", allSipAccount);
         await Promise.all(
           allSipAccount.map(async sip => {
-            if (sip?.username === emailName || sip?.username === `mobile-${emailName}`) {
+            if (sip?.username === sipName || sip?.username === `mobile-${sipName}`) {
               const deleteSipAccountResponse = await axios.delete(`${process.env.JAMBONZ_REST_API_BASE_URL}/Clients/${sip?.client_sid}`, {
                 headers: {
                   Authorization: `Bearer ${process.env.JAMBONZ_API_KEY}`,
                 },
               });
-              return deleteSipAccountResponse?.status;
             }
           }),
         );
+        return true;
       }
     } catch (error) {
       console.log("🚀 ~ file: jambonz.service.ts:78 ~ JambonzService ~ createSipAccount= ~ error:", error);

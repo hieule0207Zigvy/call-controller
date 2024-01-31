@@ -1,5 +1,5 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { CallStatus, ConfCallStatus, ConferenceType, GroupCallSettingRingingType, LegMemberStatus, MemberType } from "src/enums/enum";
+import { CallStatus, CallType, ConfCallStatus, ConferenceType, GroupCallSettingRingingType, LegMemberStatus, MemberType } from "src/enums/enum";
 import { IConfCall, ILegMember, ITypeOfToUser } from "src/types/type";
 const jambonz = require("@jambonz/node-client");
 import axios from "axios";
@@ -427,22 +427,22 @@ export class CallControllerService {
 
   updateListMemberOfConference = async (currentCallLog: IConfCall, jambonzLog: any) => {
     const { call_sid, event, friendly_name, time, members } = jambonzLog;
-    const newMembers = currentCallLog?.members || [];
-    newMembers.forEach((m: ILegMember) => {
-      if (call_sid === m.callId) {
-        m.status = LegMemberStatus[event];
-        m.statusList = [...m.statusList, LegMemberStatus[event]];
-        m.eventTime = time;
-      }
-    });
-    const prevStatusConf = currentCallLog.status;
-    const prevIsOneOfMemberAnswer = currentCallLog.isOneOfMemberAnswer;
+    // const newMembers = currentCallLog?.members || [];
+    // newMembers.forEach((m: ILegMember) => {
+    //   if (call_sid === m.callId) {
+    //     m.status = LegMemberStatus[event];
+    //     m.statusList = [...m.statusList, LegMemberStatus[event]];
+    //     m.eventTime = time;
+    //   }
+    // });
+    const prevStatusConf = currentCallLog?.status;
+    const prevIsOneOfMemberAnswer = currentCallLog?.isOneOfMemberAnswer;
     const newData = {
-      members: newMembers,
+      // members: newMembers,
       currentMemberInConf: members,
       masterCallId: currentCallLog?.masterCallId,
-      isOneOfMemberAnswer: currentCallLog.isOneOfMemberAnswer,
-      status: currentCallLog.status,
+      isOneOfMemberAnswer: currentCallLog?.isOneOfMemberAnswer,
+      status: currentCallLog?.status,
     };
     if (members >= 2 && prevStatusConf === ConfCallStatus.CREATED && prevIsOneOfMemberAnswer === false) {
       newData.isOneOfMemberAnswer = true;
@@ -496,22 +496,31 @@ export class CallControllerService {
   };
 
   endCallOfFirstInviteMemberAndUpdateListMember = async (currentCallLog: IConfCall, jambonzLog: any) => {
+    console.log("🚀 ~ CallControllerService ~ endCallOfFirstInviteMemberAndUpdateListMember= ~ endCallOfFirstInviteMemberAndUpdateListMember:");
     try {
       const { members, friendly_name, call_sid, time } = jambonzLog;
       const listPhoneFirstInviteRinging = currentCallLog?.listPhoneFirstInviteRinging || [];
-      if (!currentCallLog.isOutboundCall) {
-        const filterAcceptCallSid = listPhoneFirstInviteRinging.filter((ringingCall: string) => ringingCall !== call_sid);
-        const listMember = currentCallLog.members;
-        const endCallList = [];
-        listMember.forEach(member => {
-          if (filterAcceptCallSid.includes(member.callId) && member.status === LegMemberStatus.calling) {
-            endCallList.push(member.callId);
-          }
-        });
-        await this.endAllRingingCall(endCallList);
+      if (!currentCallLog.isOutboundCall || currentCallLog?.callType === CallType.live_chat) {
+        const membersList = currentCallLog?.members || [];
+        // const filterAcceptCallSid = listPhoneFirstInviteRinging.filter((ringingCall: string) => ringingCall !== call_sid);
+        // console.log("🚀 ~ CallControllerService ~ endCallOfFirstInviteMemberAndUpdateListMember= ~ call_sid:", call_sid)
+        // console.log("🚀 ~ CallControllerService ~ endCallOfFirstInviteMemberAndUpdateListMember= ~ filterAcceptCallSid:", filterAcceptCallSid)
+        // const listMember = currentCallLog.members;
+        // const endCallList = [];
+        // console.log("🚀 ~ CallControllerService ~ endCallOfFirstInviteMemberAndUpdateListMember= ~ endCallList:", endCallList);
+        // listMember.forEach(member => {
+        //   if (filterAcceptCallSid.includes(member.callId) && member.status === LegMemberStatus.calling) {
+        //     endCallList.push(member.callId);
+        //   }
+        // });
+        const endCallList = membersList.filter(call => listPhoneFirstInviteRinging.includes(call.callId) && call.callId !== call_sid && call.status === LegMemberStatus.calling);
+        console.log("🚀 ~ CallControllerService ~ endCallOfFirstInviteMemberAndUpdateListMember= ~ endCallList:", endCallList)
+        const endCallListIds = endCallList.map(item => item.callId);
+        console.log("🚀 ~ CallControllerService ~ endCallOfFirstInviteMemberAndUpdateListMember= ~ endCallListIds:", endCallListIds)
+        await this.endAllRingingCall(endCallListIds);
         const currentMembers = currentCallLog.members;
         currentMembers.forEach((member: ILegMember) => {
-          if (filterAcceptCallSid.includes(member.callId)) {
+          if (endCallListIds.includes(member.callId)) {
             if (member.status !== LegMemberStatus.no_answer && member.status !== LegMemberStatus.not_available) {
               member.status = LegMemberStatus.leave;
               member.statusList = [...member.statusList, LegMemberStatus.leave];
@@ -789,6 +798,8 @@ export class CallControllerService {
           listInviteEmail.push({ type: MemberType.USER, name: `${emailName}@${process.env.CHATCHILLA_SIP_DOMAIN}`, trunk: carrierName });
           listInviteEmail.push({ type: MemberType.USER, name: `mobile-${emailName}@${process.env.CHATCHILLA_SIP_DOMAIN}`, trunk: carrierName });
         });
+        console.log("🚀 ~ CallControllerService ~ makeCallAndConferenceForLiveChat= ~ allEmail:", allEmail);
+        console.log("🚀 ~ CallControllerService ~ makeCallAndConferenceForLiveChat= ~ listInviteEmail:", listInviteEmail);
       }
       jambonzClient.conference({
         name: uniqNameConference,
@@ -797,33 +808,10 @@ export class CallControllerService {
         startConferenceOnEnter: true,
         endConferenceOnExit: true,
       }); // conference created.
-      const initCallLog: IConfCall = {
-        caller: `livechat-${callerUserId}`,
-        isOneOfMemberAnswer: false,
-        confUniqueName: uniqNameConference,
-        masterCallId: "",
-        status: ConfCallStatus.CREATED,
-        members: [],
-        currentMemberInConf: 0,
-        fallOverTimeOutSid: "",
-        isOutboundCall: true,
-        listPhoneFirstInviteRinging: [],
-        eventTime: "",
-        conversationId: conversationId || "",
-        isEnableFallOver: false,
-        fallOverMediaUrl: null,
-        fallOverTimeout: null,
-        timeoutMediaUrl: null,
-        queueMediaUrl: null,
-        queueTimeout: null,
-        isTriggerQueueMedia: null,
-        isWelcomeMedia: null,
-        callerUserId,
-        userIds,
-      };
-      await this.setCallLogToRedis(uniqNameConference, initCallLog, null);
       res.status(200).json(jambonzClient);
-      Promise.all(
+      const allFistInvMem = [];
+      const allFistCallIds = [];
+      await Promise.all(
         listInviteEmail.map(async (member: ITypeOfToUser) => {
           let userIdData = "";
           const callRingingSid = await this.client.calls.create({
@@ -853,10 +841,45 @@ export class CallControllerService {
               fromLiveChat: true,
             },
           });
+          allFistInvMem.push({
+            callId: callRingingSid,
+            type: member.type === MemberType.USER ? MemberType.USER : MemberType.EXTERNAL_PHONE,
+            value: member.type === MemberType.USER ? member.name : member.number,
+            status: LegMemberStatus.calling,
+            statusList: [LegMemberStatus.calling],
+          });
+          allFistCallIds.push(callRingingSid);
         }),
       ).catch(err => {
         console.log("🚀 ~ file: call-controller.controller.ts:534 ~ CallControllerController ~ callHook ~ err:", err);
       });
+      const initCallLog: IConfCall = {
+        caller: `livechat-${callerUserId}`,
+        isOneOfMemberAnswer: false,
+        confUniqueName: uniqNameConference,
+        masterCallId: "",
+        status: ConfCallStatus.CREATED,
+        members: allFistInvMem,
+        currentMemberInConf: 0,
+        fallOverTimeOutSid: "",
+        isOutboundCall: true,
+        listPhoneFirstInviteRinging: allFistCallIds,
+        eventTime: "",
+        conversationId: conversationId || "",
+        isEnableFallOver: false,
+        fallOverMediaUrl: null,
+        fallOverTimeout: null,
+        timeoutMediaUrl: null,
+        queueMediaUrl: null,
+        queueTimeout: null,
+        isTriggerQueueMedia: null,
+        isWelcomeMedia: null,
+        callerUserId,
+        userIds,
+        callType: CallType.live_chat,
+      };
+
+      await this.setCallLogToRedis(uniqNameConference, initCallLog, null);
     } catch (error) {}
   };
 }

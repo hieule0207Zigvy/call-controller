@@ -6,7 +6,7 @@ const WebhookResponse = require("@jambonz/node-client").WebhookResponse;
 const jambonz = require("@jambonz/node-client");
 import axios, { AxiosInstance } from "axios";
 import { IUpdateConferenceOption, IToUserType, ILegMember, IConfCall, ITypeOfToUser } from "./../types/type";
-import { ConfCallStatus, MemberType, LegMemberStatus, ConferenceType, GroupCallSettingRingingType, CallingType, CallStatus } from "./../enums/enum";
+import { ConfCallStatus, MemberType, LegMemberStatus, ConferenceType, GroupCallSettingRingingType, CallingType, CallStatus, CallStatusMapping } from "./../enums/enum";
 import { CallControllerService } from "./call-controller.service";
 import { Cache } from "cache-manager";
 import { JambonzService } from "src/jambonz/jambonz.service";
@@ -20,7 +20,6 @@ export class CallControllerController {
   private client: any = jambonz(process.env.JAMBONZ_ACCOUNT_SID, process.env.JAMBONZ_API_KEY, {
     baseUrl: process.env.JAMBONZ_REST_API_BASE_URL,
   });
-
   @Get()
   async test(): Promise<string> {
     return "Call controller";
@@ -351,7 +350,7 @@ export class CallControllerController {
           method: "GET",
         },
         call_status_hook: {
-          url: `${process.env.BACKEND_URL}/call-controller/invite-call-status`,
+          url: `${process.env.BACKEND_URL}/call-status/${uniqNameConference}`,
           method: "POST",
         },
         speech_synthesis_vendor: "google",
@@ -596,7 +595,9 @@ export class CallControllerController {
     const { customerData } = req.body;
     const { dtmfToIvr, from, conversationId, groupId, userId, uniqNameConference } = customerData;
     const callList = _.uniqBy(dtmfToIvr.memberNeedToCall, "name");
-    Promise.all(
+    const allFistInvMem = [];
+    const allFistCallIds = [];
+    await Promise.all(
       callList.map(async (member: ITypeOfToUser) => {
         const userIdList = [];
         dtmfToIvr?.userId.forEach(user => {
@@ -629,11 +630,21 @@ export class CallControllerController {
             userId: userIdList,
           },
         });
+        allFistInvMem.push({
+          callId: callRingingSid,
+          type: member.type === MemberType.USER ? MemberType.USER : MemberType.EXTERNAL_PHONE,
+          value: member.type === MemberType.USER ? member.name : member.number,
+          status: LegMemberStatus.calling,
+          statusList: [LegMemberStatus.calling],
+        });
+        allFistCallIds.push(callRingingSid);
       }),
     ).catch(err => {
       console.log("🚀 ~ file: call-controller.controller.ts:534 ~ CallControllerController ~ callHook ~ err:", err);
       res.sendStatus(503);
     });
+    const currentCallLog: IConfCall = await this.callControllerService.getCallLogOfCall(uniqNameConference);
+    await this.callControllerService.setCallLogToRedis(uniqNameConference, { members: allFistInvMem, listPhoneFirstInviteRinging: allFistCallIds }, currentCallLog);
     res.sendStatus(200);
   }
 
@@ -686,7 +697,9 @@ export class CallControllerController {
       return res.status(200).json(app);
     }
     const callList = _.uniqBy(ivrTimeoutData.timeoutMemberNeedToCall, "name");
-    Promise.all(
+    const allFistInvMem = [];
+    const allFistCallIds = [];
+    await Promise.all(
       callList.map(async (member: ITypeOfToUser) => {
         const userIdList = [];
         ivrTimeoutData?.timeoutUserId.forEach(user => {
@@ -719,12 +732,21 @@ export class CallControllerController {
             userId: userIdList,
           },
         });
-        console.log("🚀 ~ file: call-controller.controller.ts:590 ~ CallControllerController ~ callList.map ~ callRingingSid:", callRingingSid);
+        allFistInvMem.push({
+          callId: callRingingSid,
+          type: member.type === MemberType.USER ? MemberType.USER : MemberType.EXTERNAL_PHONE,
+          value: member.type === MemberType.USER ? member.name : member.number,
+          status: LegMemberStatus.calling,
+          statusList: [LegMemberStatus.calling],
+        });
+        allFistCallIds.push(callRingingSid);
       }),
     ).catch(err => {
       console.log("🚀 ~ file: call-controller.controller.ts:534 ~ CallControllerController ~ callHook ~ err:", err);
       res.sendStatus(503);
     });
+    const currentCallLog: IConfCall = await this.callControllerService.getCallLogOfCall(confUniqueName);
+    await this.callControllerService.setCallLogToRedis(confUniqueName, { members: allFistInvMem, listPhoneFirstInviteRinging: allFistCallIds }, currentCallLog);
     res.sendStatus(200);
   }
 
@@ -749,7 +771,9 @@ export class CallControllerController {
       return res.status(200).json(app);
     }
     const callList = _.uniqBy(failoverData.failoverMemberNeedToCall, "name");
-    Promise.all(
+    const allFistInvMem = [];
+    const allFistCallIds = [];
+    await Promise.all(
       callList.map(async (member: ITypeOfToUser) => {
         const userIdList = [];
         failoverData?.failoverUserId.forEach(user => {
@@ -782,12 +806,21 @@ export class CallControllerController {
             userId: userIdList,
           },
         });
-        console.log("🚀 ~ file: call-controller.controller.ts:590 ~ CallControllerController ~ callList.map ~ callRingingSid:", callRingingSid);
+        allFistInvMem.push({
+          callId: callRingingSid,
+          type: member.type === MemberType.USER ? MemberType.USER : MemberType.EXTERNAL_PHONE,
+          value: member.type === MemberType.USER ? member.name : member.number,
+          status: LegMemberStatus.calling,
+          statusList: [LegMemberStatus.calling],
+        });
+        allFistCallIds.push(callRingingSid);
       }),
     ).catch(err => {
       console.log("🚀 ~ file: call-controller.controller.ts:534 ~ CallControllerController ~ callHook ~ err:", err);
       res.sendStatus(503);
     });
+    const currentCallLog: IConfCall = await this.callControllerService.getCallLogOfCall(confUniqueName);
+    await this.callControllerService.setCallLogToRedis(confUniqueName, { members: allFistInvMem, listPhoneFirstInviteRinging: allFistCallIds }, currentCallLog);
     res.sendStatus(200);
   }
 
@@ -917,8 +950,9 @@ export class CallControllerController {
     const { listMember = [], uniqNameConference, from, conversationId, groupId, userId, queueTimeout } = customerData;
     // const members = [];
     const callList = _.uniqBy(listMember, "name");
-    console.log("🚀 ~ CallControllerController ~ callHook ~ callList:", callList);
-    Promise.all(
+    const allFistInvMem = [];
+    const allFistCallIds = [];
+    await Promise.all(
       callList.map(async (member: ITypeOfToUser) => {
         let userIdData = "";
         userId.forEach(userData => {
@@ -951,11 +985,21 @@ export class CallControllerController {
             userId: userIdData,
           },
         });
+        allFistInvMem.push({
+          callId: callRingingSid,
+          type: member.type === MemberType.USER ? MemberType.USER : MemberType.EXTERNAL_PHONE,
+          value: member.type === MemberType.USER ? member.name : member.number,
+          status: LegMemberStatus.calling,
+          statusList: [LegMemberStatus.calling],
+        });
+        allFistCallIds.push(callRingingSid);
       }),
     ).catch(err => {
       console.log("🚀 ~ file: call-controller.controller.ts:534 ~ CallControllerController ~ callHook ~ err:", err);
       res.sendStatus(503);
     });
+    const currentCallLog: IConfCall = await this.callControllerService.getCallLogOfCall(uniqNameConference);
+    await this.callControllerService.setCallLogToRedis(uniqNameConference, { members: allFistInvMem, listPhoneFirstInviteRinging: allFistCallIds }, currentCallLog);
     res.sendStatus(200);
   }
 
@@ -992,69 +1036,28 @@ export class CallControllerController {
   async callStatus(@Req() req: Request, @Res() res: Response): Promise<any> {
     const { conferenceName } = req.params;
     const { call_sid, sip_status, call_status, to } = req.body;
-    console.log("🚀 ~ file: call-controller.controller.ts:575 ~ CallControllerController ~ callStatus ~ req.body:", req.body);
+    // console.log("🚀 ~ CallControllerController ~ callStatus ~ req.body:", req.body);
     const currentCallLog: IConfCall = await this.callControllerService.getCallLogOfCall(conferenceName);
-    const { listPhoneFirstInviteRinging = [] } = currentCallLog;
-    const members = currentCallLog?.members || [];
-    const updateMemberList = members;
+    const prevMember = currentCallLog?.members;
+    // console.log("🚀 ~ CallControllerController ~ callStatus ~ req.body:", { body: req.body, currentCallLog });
+    let updateMemberList = prevMember;
+    let type = "";
+    if (isPhoneNumberOrSIP(to) === MemberType.EXTERNAL_PHONE) {
+      type = MemberType.EXTERNAL_PHONE;
+    } else type = MemberType.USER;
 
-    const memberIds = updateMemberList.map(m => m.callId);
-    if (call_status === CallStatus.trying && !memberIds.includes(call_sid)) {
-      let type = "";
-      if (isPhoneNumberOrSIP(to) === MemberType.EXTERNAL_PHONE) {
-        type = MemberType.EXTERNAL_PHONE;
-      } else type = MemberType.USER;
-      const memberData: ILegMember = {
-        callId: call_sid,
-        type,
-        status: LegMemberStatus.calling,
-        value: to,
-        statusList: [LegMemberStatus.calling],
-      };
-      updateMemberList.push(memberData);
-      if (!listPhoneFirstInviteRinging.includes(call_sid)) listPhoneFirstInviteRinging.push(call_sid);
-      await this.callControllerService.setCallLogToRedis(conferenceName, { members: updateMemberList, listPhoneFirstInviteRinging }, currentCallLog);
-      const updatedLog = { ...currentCallLog, ...{ members: updateMemberList, listPhoneFirstInviteRinging } };
-      const response = await axios.post(`${process.env.CHATCHILLA_BACKEND_URL}/voice-log`, { log: updatedLog });
-      return res.sendStatus(200);
-    }
-    if (call_status === CallStatus.in_progress && !memberIds.includes(call_sid)) {
-      let type = "";
-      if (isPhoneNumberOrSIP(to) === MemberType.EXTERNAL_PHONE) {
-        type = MemberType.EXTERNAL_PHONE;
-      } else type = MemberType.USER;
-      const memberData: ILegMember = {
-        callId: call_sid,
-        type,
-        status: LegMemberStatus.join,
-        value: to,
-        statusList: [LegMemberStatus.calling, LegMemberStatus.join],
-      };
-      updateMemberList.push(memberData);
-    }
-    if (call_status === CallStatus.no_answer || call_status === CallStatus.not_available) {
-      updateMemberList.forEach((member: ILegMember) => {
-        if (member.callId === call_sid) {
-          if (call_status === CallStatus.not_available) {
-            member.status = LegMemberStatus.not_available;
-            member.statusList = [LegMemberStatus.calling, LegMemberStatus.not_available];
-          } else {
-            member.status = LegMemberStatus.no_answer;
-            member.statusList = [LegMemberStatus.calling, LegMemberStatus.no_answer];
-          }
-        }
-      });
-    }
-    if (call_status === CallStatus.completed) {
-      updateMemberList.forEach((member: ILegMember) => {
-        if (call_status === CallStatus.not_available) {
-          member.status = LegMemberStatus.leave;
-          member.statusList = [...member.statusList, LegMemberStatus.leave];
-        }
-      });
-    }
+    updateMemberList.forEach(member => {
+      const oldStatusList = member.statusList;
+      if (member.callId === call_sid) {
+        member.status = LegMemberStatus[CallStatusMapping[call_status]];
+        member.statusList = [...oldStatusList, LegMemberStatus[CallStatusMapping[call_status]]];
+      }
+    });
+    // const finalListMemberList = updateMemberList.filter(item => !!item.status);
     await this.callControllerService.setCallLogToRedis(conferenceName, { members: updateMemberList }, currentCallLog);
-    const updatedLog = { ...currentCallLog, members: updateMemberList };
+
+    const updatedLog: IConfCall = { ...currentCallLog, members: updateMemberList };
+    // console.log("🚀 ~ CallControllerController ~ callStatus ~ updatedLog:", updatedLog);
     const response = await axios.post(`${process.env.CHATCHILLA_BACKEND_URL}/voice-log`, { log: updatedLog });
     return res.sendStatus(200);
   }
@@ -1064,9 +1067,11 @@ export class CallControllerController {
     try {
       const { body } = req;
       const { conference_sid, event, members, friendly_name, call_sid, to, time, direction, duration } = body;
-      console.log("🚀 ~ file: call-controller.controller.ts:686 ~ CallControllerController ~ conferenceStatus ~ body:", body);
-      if (!event) return res.sendStatus(200);
       const currentCallLog: IConfCall = await this.callControllerService.getCallLogOfCall(friendly_name);
+      if (!body?.event) return res.sendStatus(200);
+      console.log("🚀 ~ file: call-controller.controller.ts:686 ~ CallControllerController ~ conferenceStatus ~ body:", body);
+
+      console.log("🚀 ~ CallControllerController ~ conferenceStatus ~ currentCallLog:", currentCallLog);
       const groupCallSetting = currentCallLog?.groupCallSetting;
       const callSettingDidNotHaveQueueMedia =
         groupCallSetting === GroupCallSettingRingingType.OTHER_GROUP ||
@@ -1083,7 +1088,7 @@ export class CallControllerController {
       const isMemberCall = call_sid !== currentCallLog?.masterCallId && direction === CallingType.OUTBOUND;
       const conferenceStatus = currentCallLog?.status;
       const isTriggeredQueueMediaOrNotEnable = (!isEnableQueueMedia || (isEnableQueueMedia && isTriggerQueueMedia)) && conferenceStatus !== ConfCallStatus.QUEUE;
-      const callLegMembers = currentCallLog.members;
+      const callLegMembers = currentCallLog?.members || [];
       const isCallerLeft = currentCallLog?.isCallerLeft;
       const isAllLegsMembersLeaveCall = callLegMembers.every((leg: ILegMember) => leg.status !== LegMemberStatus.join) || (members === 1 && isCallerLeft && isOutboundCall);
       const isOutboundCallEnded = isCallerLeft && isAllLegsMembersLeaveCall && isOutboundCall;
@@ -1118,7 +1123,9 @@ export class CallControllerController {
         await this.callControllerService.updateMemberAndStateOfEndedConference(currentCallLog, body, isEnableQueueMedia, false);
       }
       const updatedLog = await this.callControllerService.getCallLogOfCall(friendly_name);
-      const response = await axios.post(`${process.env.CHATCHILLA_BACKEND_URL}/voice-log`, { log: updatedLog });
+      if (!!currentCallLog?.status) {
+        const response = await axios.post(`${process.env.CHATCHILLA_BACKEND_URL}/voice-log`, { log: updatedLog });
+      }
       return res.sendStatus(200);
     } catch (error) {
       console.log("🚀 ~ file: call-controller.controller.ts:362 ~ CallControllerController ~ conferenceStatus ~ error:", error);

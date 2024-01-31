@@ -1,4 +1,4 @@
-import { LegMemberStatus, ConfCallStatus, MemberType } from "src/enums/enum";
+import { LegMemberStatus, ConfCallStatus, MemberType, CallType } from "src/enums/enum";
 
 export interface IToUserType {
   type?: string;
@@ -53,6 +53,7 @@ export interface IConfCall {
   callerNumber?: string;
   callerUserId?: string;
   userIds?: string[];
+  callType?: CallType;
 }
 
 export interface ITypeOfToUser {

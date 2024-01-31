@@ -12,6 +12,22 @@ export enum MemberType {
   USER = "user",
 }
 
+export enum CallStatus {
+  trying = "trying",
+  ringing = "ringing",
+  no_answer = "no-answer",
+  not_available = "failed",
+  in_progress = "in-progress",
+  completed = "completed",
+}
+export enum CallStatusMapping {
+  trying = "calling",
+  ringing = "calling",
+  "no-answer" = "no_answer",
+  "failed" = "not_available",
+  "in-progress" = "join",
+  completed = "leave",
+}
 export enum LegMemberStatus {
   calling = "CALLING",
   join = "JOIN",
@@ -45,19 +61,14 @@ export enum CallingType {
   OUTBOUND = "outbound",
 }
 
-export enum CallStatus {
-  ringing = "ringing",
-  no_answer = "no-answer",
-  not_available = "failed",
-  trying = "trying",
-  early_media = "early-media",
-  in_progress = "in-progress",
-  completed = "completed",
-}
-
 export enum SampleMedia {
   welcomeMedia = "",
   queueMedia = "https://smartonhold.com.au/wp-content/uploads/2021/11/FEMALE-DEMO-2-Inga-Feitsma-5-11-21.mp3",
   timeoutMedia = "https://smartonhold.com.au/wp-content/uploads/2023/07/Male-Demo-Rick-Davey.mp3",
   voicemailMedia = "https://smartonhold.com.au/wp-content/uploads/2023/04/Male-Demo-1Mark-Fox.mp3",
+}
+
+export enum CallType {
+  default = "DEFAULT",
+  live_chat = "LIVE_CHAT",
 }
