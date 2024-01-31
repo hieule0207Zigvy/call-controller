@@ -6,7 +6,7 @@ const WebhookResponse = require("@jambonz/node-client").WebhookResponse;
 const jambonz = require("@jambonz/node-client");
 import axios, { AxiosInstance } from "axios";
 import { IUpdateConferenceOption, IToUserType, ILegMember, IConfCall, ITypeOfToUser } from "./../types/type";
-import { ConfCallStatus, MemberType, LegMemberStatus, ConferenceType, GroupCallSettingRingingType, CallingType, CallStatus, CallStatusMapping } from "./../enums/enum";
+import { ConfCallStatus, MemberType, LegMemberStatus, ConferenceType, GroupCallSettingRingingType, CallingType, CallStatus, CallStatusMapping, CallType } from "./../enums/enum";
 import { CallControllerService } from "./call-controller.service";
 import { Cache } from "cache-manager";
 import { JambonzService } from "src/jambonz/jambonz.service";
@@ -415,7 +415,6 @@ export class CallControllerController {
 
     if (isMasterCall) {
       const allCallIdInCall = [];
-
       const members = currentCallLog?.members || [];
       members.forEach(member => {
         if (member?.status === LegMemberStatus.join || member?.status === LegMemberStatus.calling) {
@@ -423,6 +422,7 @@ export class CallControllerController {
         }
       });
       allCallIdInCall.push(currentCallLog?.masterCallId);
+
       const status = await this.callControllerService.endAllRingingCall(allCallIdInCall);
       await this.callControllerService.setCallLogToRedis(conferenceName, { isCallerLeft: true }, currentCallLog);
       const updatedLog = { ...currentCallLog, isCallerLeft: true };
@@ -1040,7 +1040,7 @@ export class CallControllerController {
     const currentCallLog: IConfCall = await this.callControllerService.getCallLogOfCall(conferenceName);
     const prevMember = currentCallLog?.members;
     // console.log("🚀 ~ CallControllerController ~ callStatus ~ req.body:", { body: req.body, currentCallLog });
-    let updateMemberList = prevMember;
+    let updateMemberList = prevMember || [];
     let type = "";
     if (isPhoneNumberOrSIP(to) === MemberType.EXTERNAL_PHONE) {
       type = MemberType.EXTERNAL_PHONE;
@@ -1096,7 +1096,7 @@ export class CallControllerController {
       const isConferenceEnded = (isLogEnded && isTriggeredQueueMediaOrNotEnable) || isOutboundCallEnded;
 
       await this.callControllerService.updateListMemberOfConference(currentCallLog, body); // update member whenever member join or leave
-      if (event === ConferenceType.START) {
+      if (event === ConferenceType.START && currentCallLog?.callType !== CallType.live_chat) {
         const newestData = await this.callControllerService.getCallLogOfCall(friendly_name);
         if (isEnableFallOver && !isEnableQueueMedia && !isOutboundCall) {
           await this.callControllerService.triggerFallOverTimeoutWithoutQueueMedia(newestData, body);

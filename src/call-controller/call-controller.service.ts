@@ -496,27 +496,12 @@ export class CallControllerService {
   };
 
   endCallOfFirstInviteMemberAndUpdateListMember = async (currentCallLog: IConfCall, jambonzLog: any) => {
-    console.log("🚀 ~ CallControllerService ~ endCallOfFirstInviteMemberAndUpdateListMember= ~ endCallOfFirstInviteMemberAndUpdateListMember:");
     try {
       const { members, friendly_name, call_sid, time } = jambonzLog;
       const listPhoneFirstInviteRinging = currentCallLog?.listPhoneFirstInviteRinging || [];
       if (!currentCallLog.isOutboundCall || currentCallLog?.callType === CallType.live_chat) {
         const membersList = currentCallLog?.members || [];
-        // const filterAcceptCallSid = listPhoneFirstInviteRinging.filter((ringingCall: string) => ringingCall !== call_sid);
-        // console.log("🚀 ~ CallControllerService ~ endCallOfFirstInviteMemberAndUpdateListMember= ~ call_sid:", call_sid)
-        // console.log("🚀 ~ CallControllerService ~ endCallOfFirstInviteMemberAndUpdateListMember= ~ filterAcceptCallSid:", filterAcceptCallSid)
-        // const listMember = currentCallLog.members;
-        // const endCallList = [];
-        // console.log("🚀 ~ CallControllerService ~ endCallOfFirstInviteMemberAndUpdateListMember= ~ endCallList:", endCallList);
-        // listMember.forEach(member => {
-        //   if (filterAcceptCallSid.includes(member.callId) && member.status === LegMemberStatus.calling) {
-        //     endCallList.push(member.callId);
-        //   }
-        // });
-        const endCallList = membersList.filter(call => listPhoneFirstInviteRinging.includes(call.callId) && call.callId !== call_sid && call.status === LegMemberStatus.calling);
-        console.log("🚀 ~ CallControllerService ~ endCallOfFirstInviteMemberAndUpdateListMember= ~ endCallList:", endCallList)
-        const endCallListIds = endCallList.map(item => item.callId);
-        console.log("🚀 ~ CallControllerService ~ endCallOfFirstInviteMemberAndUpdateListMember= ~ endCallListIds:", endCallListIds)
+        const endCallList = membersList.filter(call => listPhoneFirstInviteRinging.includes(call.callId) && call.callId !== call_sid && call.status === LegMemberStatus.calling);        const endCallListIds = endCallList.map(item => item.callId);
         await this.endAllRingingCall(endCallListIds);
         const currentMembers = currentCallLog.members;
         currentMembers.forEach((member: ILegMember) => {
@@ -797,9 +782,7 @@ export class CallControllerService {
           const emailName = getNameOfEmail(email);
           listInviteEmail.push({ type: MemberType.USER, name: `${emailName}@${process.env.CHATCHILLA_SIP_DOMAIN}`, trunk: carrierName });
           listInviteEmail.push({ type: MemberType.USER, name: `mobile-${emailName}@${process.env.CHATCHILLA_SIP_DOMAIN}`, trunk: carrierName });
-        });
-        console.log("🚀 ~ CallControllerService ~ makeCallAndConferenceForLiveChat= ~ allEmail:", allEmail);
-        console.log("🚀 ~ CallControllerService ~ makeCallAndConferenceForLiveChat= ~ listInviteEmail:", listInviteEmail);
+        });        
       }
       jambonzClient.conference({
         name: uniqNameConference,
@@ -808,7 +791,6 @@ export class CallControllerService {
         startConferenceOnEnter: true,
         endConferenceOnExit: true,
       }); // conference created.
-      res.status(200).json(jambonzClient);
       const allFistInvMem = [];
       const allFistCallIds = [];
       await Promise.all(
@@ -878,8 +860,8 @@ export class CallControllerService {
         userIds,
         callType: CallType.live_chat,
       };
-
       await this.setCallLogToRedis(uniqNameConference, initCallLog, null);
+      res.status(200).json(jambonzClient);
     } catch (error) {}
   };
 }
