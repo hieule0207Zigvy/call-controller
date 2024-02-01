@@ -196,7 +196,7 @@ export class CallControllerController {
       if (!headers) return res.status(400);
       const app = new WebhookResponse();
 
-      const { ani = "", to, conferencename, carrier, userid, fromlivechat } = headers;
+      const { ani = "", to, conferencename, carrier, userid, fromlivechat, conversationid, agentcall } = headers;
       const carrierName = await this.jambonzService.getCarrierName(carrier);
       if (fromlivechat) {
         return this.callControllerService.makeCallAndConferenceForLiveChat(app, headers, carrierName, res);
@@ -251,7 +251,7 @@ export class CallControllerController {
         isOutboundCall: true,
         listPhoneFirstInviteRinging: [],
         eventTime: "",
-        conversationId: sip?.headers?.conversationid || "",
+        conversationId: conversationid || "",
         isEnableFallOver: false,
         fallOverMediaUrl: null,
         fallOverTimeout: null,
@@ -1036,7 +1036,7 @@ export class CallControllerController {
   async callStatus(@Req() req: Request, @Res() res: Response): Promise<any> {
     const { conferenceName } = req.params;
     const { call_sid, sip_status, call_status, to } = req.body;
-    // console.log("🚀 ~ CallControllerController ~ callStatus ~ req.body:", req.body);
+    console.log("🚀 ~ CallControllerController ~ callStatus ~ req.body:", req.body);
     const currentCallLog: IConfCall = await this.callControllerService.getCallLogOfCall(conferenceName);
     const prevMember = currentCallLog?.members;
     // console.log("🚀 ~ CallControllerController ~ callStatus ~ req.body:", { body: req.body, currentCallLog });
@@ -1071,7 +1071,7 @@ export class CallControllerController {
       if (!body?.event) return res.sendStatus(200);
       console.log("🚀 ~ file: call-controller.controller.ts:686 ~ CallControllerController ~ conferenceStatus ~ body:", body);
 
-      console.log("🚀 ~ CallControllerController ~ conferenceStatus ~ currentCallLog:", currentCallLog);
+      // console.log("🚀 ~ CallControllerController ~ conferenceStatus ~ currentCallLog:", currentCallLog);
       const groupCallSetting = currentCallLog?.groupCallSetting;
       const callSettingDidNotHaveQueueMedia =
         groupCallSetting === GroupCallSettingRingingType.OTHER_GROUP ||
@@ -1123,9 +1123,7 @@ export class CallControllerController {
         await this.callControllerService.updateMemberAndStateOfEndedConference(currentCallLog, body, isEnableQueueMedia, false);
       }
       const updatedLog = await this.callControllerService.getCallLogOfCall(friendly_name);
-      if (!!currentCallLog?.status) {
-        const response = await axios.post(`${process.env.CHATCHILLA_BACKEND_URL}/voice-log`, { log: updatedLog });
-      }
+      const response = await axios.post(`${process.env.CHATCHILLA_BACKEND_URL}/voice-log`, { log: updatedLog });
       return res.sendStatus(200);
     } catch (error) {
       console.log("🚀 ~ file: call-controller.controller.ts:362 ~ CallControllerController ~ conferenceStatus ~ error:", error);

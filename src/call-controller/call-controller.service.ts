@@ -427,14 +427,14 @@ export class CallControllerService {
 
   updateListMemberOfConference = async (currentCallLog: IConfCall, jambonzLog: any) => {
     const { call_sid, event, friendly_name, time, members } = jambonzLog;
-    // const newMembers = currentCallLog?.members || [];
-    // newMembers.forEach((m: ILegMember) => {
-    //   if (call_sid === m.callId) {
-    //     m.status = LegMemberStatus[event];
-    //     m.statusList = [...m.statusList, LegMemberStatus[event]];
-    //     m.eventTime = time;
-    //   }
-    // });
+    const newMembers = currentCallLog?.members || [];
+    newMembers.forEach((m: ILegMember) => {
+      if (call_sid === m.callId) {
+        m.status = LegMemberStatus[event];
+        m.statusList = [...m.statusList, LegMemberStatus[event]];
+        m.eventTime = time;
+      }
+    });
     const prevStatusConf = currentCallLog?.status;
     const prevIsOneOfMemberAnswer = currentCallLog?.isOneOfMemberAnswer;
     const newData = {
@@ -501,7 +501,8 @@ export class CallControllerService {
       const listPhoneFirstInviteRinging = currentCallLog?.listPhoneFirstInviteRinging || [];
       if (!currentCallLog.isOutboundCall || currentCallLog?.callType === CallType.live_chat) {
         const membersList = currentCallLog?.members || [];
-        const endCallList = membersList.filter(call => listPhoneFirstInviteRinging.includes(call.callId) && call.callId !== call_sid && call.status === LegMemberStatus.calling);        const endCallListIds = endCallList.map(item => item.callId);
+        const endCallList = membersList.filter(call => listPhoneFirstInviteRinging.includes(call.callId) && call.callId !== call_sid && call.status === LegMemberStatus.calling);
+        const endCallListIds = endCallList.map(item => item.callId);
         await this.endAllRingingCall(endCallListIds);
         const currentMembers = currentCallLog.members;
         currentMembers.forEach((member: ILegMember) => {
@@ -771,19 +772,27 @@ export class CallControllerService {
       const uniqNameConference = headers?.conferencename;
       const callerUserId = headers?.userid;
       const conversationId = headers?.conversationid;
-      const groupCallSettingResponse = await axios.post(`${process.env.CHATCHILLA_BACKEND_URL}/group/group_member_email`, { groupId });
-      if (groupCallSettingResponse?.status !== 200) return;
-      const { data } = groupCallSettingResponse;
-      const allEmail = data?.userEmail;
-      const userIds = data?.userIds;
+      const isAgentCall = headers?.agentcall;
       const listInviteEmail = [];
-      if (allEmail.length > 0) {
-        allEmail.forEach(email => {
-          const emailName = getNameOfEmail(email);
-          listInviteEmail.push({ type: MemberType.USER, name: `${emailName}@${process.env.CHATCHILLA_SIP_DOMAIN}`, trunk: carrierName });
-          listInviteEmail.push({ type: MemberType.USER, name: `mobile-${emailName}@${process.env.CHATCHILLA_SIP_DOMAIN}`, trunk: carrierName });
-        });        
+      let userIds = [];
+      if (isAgentCall) {
+        listInviteEmail.push({ type: MemberType.USER, name: `${conversationId}@${process.env.CHATCHILLA_SIP_DOMAIN}`, trunk: carrierName });
+      } else {
+        const groupCallSettingResponse = await axios.post(`${process.env.CHATCHILLA_BACKEND_URL}/group/group_member_email`, { groupId });
+        if (groupCallSettingResponse?.status !== 200) return;
+        const { data } = groupCallSettingResponse;
+        const allEmail = data?.userEmail;
+        userIds = data?.userIds;
+
+        if (allEmail.length > 0) {
+          allEmail.forEach(email => {
+            const emailName = getNameOfEmail(email);
+            listInviteEmail.push({ type: MemberType.USER, name: `${emailName}@${process.env.CHATCHILLA_SIP_DOMAIN}`, trunk: carrierName });
+            listInviteEmail.push({ type: MemberType.USER, name: `mobile-${emailName}@${process.env.CHATCHILLA_SIP_DOMAIN}`, trunk: carrierName });
+          });
+        }
       }
+
       jambonzClient.conference({
         name: uniqNameConference,
         statusEvents: [ConferenceType.END, ConferenceType.JOIN, ConferenceType.START, ConferenceType.LEAVE],
